@@ -75,9 +75,10 @@ próximas facturas a vencer.
   email y **rubros** (agregás uno o varios; elegís el **principal**, con el que
   se agrupa y se registra la deuda).
 - **Editar:** botón en cada fila.
-- **Ver ficha (cuenta corriente):** abre la ficha con **facturas y pagos lado a
-  lado**, los totales **facturado** y **pagado**, y la **deuda**. Desde ahí
-  podés **Cargar factura**, **Registrar pago** y **Anular** pagos.
+- **Ver ficha (cuenta corriente):** abre la ficha con tabs **Facturas**,
+  **Pagos** y **Debe / Haber** (totales facturado y pagado), y la **deuda**
+  arriba. Desde ahí podés **Cargar factura**, **Registrar pago** y **Anular**
+  pagos.
 - **Exportar Excel:** baja la deuda de todos los proveedores a un `.xlsx`.
 
 ### 3.3 Facturas
@@ -85,7 +86,9 @@ próximas facturas a vencer.
 2. Cargá **Comprobante** (A/B/C), número, fechas de emisión y vencimiento.
 3. **Importes con cálculo bidireccional:** escribís el **neto** y se completa el
    **total** (o al revés). Elegís la **alícuota** de IVA y, si hay,
-   **percepciones**. Abajo ves el desglose (neto · IVA · percep · total).
+   **percepciones** (IVA/IIBB) y/o **impuesto interno / otros** (cargos no
+   recuperables, ej. bebidas alcohólicas). Abajo ves el desglose completo
+   (neto · IVA · percep · otros imp. · total).
 4. **(Opcional) Actualizar costos de insumos de esta compra:** agregás filas
    con **insumo + cantidad + unidad + precio neto**. Al guardar, se **actualiza
    el costo** de esos insumos (queda en su historial) y se **recalculan las

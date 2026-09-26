@@ -386,7 +386,8 @@ function modalFactura(prov, onDone) {
       <div class="fila">
         <div>${labelInfo("ff-ali", "Alícuota", "IVA de la factura.")}<select id="ff-ali">${ivaOpts}</select></div>
         <div>${labelInfo("ff-neto", "Neto ($)", "Sin IVA. Se completa solo si cargás el total.")}<input id="ff-neto" placeholder="0,00" /></div>
-        <div>${labelInfo("ff-percep", "Percepciones ($)", "Opcional.")}<input id="ff-percep" placeholder="0,00" /></div>
+        <div>${labelInfo("ff-percep", "Percepciones ($)", "IVA/IIBB. Opcional.")}<input id="ff-percep" placeholder="0,00" /></div>
+        <div>${labelInfo("ff-otros", "Imp. interno / otros ($)", "Impuesto interno u otros cargos no recuperables (ej. bebidas alcohólicas). Opcional.")}<input id="ff-otros" placeholder="0,00" /></div>
         <div>${labelInfo("ff-total", "Total ($)", "Lo que va a la cuenta corriente.")}<input id="ff-total" placeholder="0,00" /></div>
       </div>
       <p id="ff-desg" class="muted" style="margin-top:8px;"></p>
@@ -400,17 +401,19 @@ function modalFactura(prov, onDone) {
   const desglose = () => desglosarFactura({
     desde: lado, montoCentavos: pesosACentavos(g(lado === "neto" ? "#ff-neto" : "#ff-total").value),
     alicuota: Number(g("#ff-ali").value) || 0, percepcionesCentavos: pesosACentavos(g("#ff-percep").value),
+    otrosImpuestosCentavos: pesosACentavos(g("#ff-otros").value),
   });
   const recomputar = () => {
     const d = desglose();
     if (lado === "neto") g("#ff-total").value = formatearCentavos(d.total, { simbolo: false });
     else g("#ff-neto").value = formatearCentavos(d.neto, { simbolo: false });
-    g("#ff-desg").innerHTML = `Neto ${formatearCentavos(d.neto)} · IVA ${formatearCentavos(d.iva)} · Percep. ${formatearCentavos(d.percepciones)} · <strong>Total ${formatearCentavos(d.total)}</strong>`;
+    g("#ff-desg").innerHTML = `Neto ${formatearCentavos(d.neto)} · IVA ${formatearCentavos(d.iva)} · Percep. ${formatearCentavos(d.percepciones)} · Otros imp. ${formatearCentavos(d.otrosImpuestos)} · <strong>Total ${formatearCentavos(d.total)}</strong>`;
   };
   g("#ff-neto").addEventListener("input", () => { lado = "neto"; recomputar(); });
   g("#ff-total").addEventListener("input", () => { lado = "total"; recomputar(); });
   g("#ff-ali").addEventListener("change", recomputar);
   g("#ff-percep").addEventListener("input", recomputar);
+  g("#ff-otros").addEventListener("input", recomputar);
   g("#ff-cancelar").addEventListener("click", cerrarModal);
 
   g("#ff").addEventListener("submit", async (e) => {
@@ -424,7 +427,8 @@ function modalFactura(prov, onDone) {
         proveedor_id: prov.id, tipo_comprobante: g("#ff-tipo").value, numero_factura: g("#ff-num").value,
         fecha_emision: g("#ff-emi").value || hoy(), fecha_vencimiento: g("#ff-venc").value || null,
         neto_gravado_centavos: d.neto, iva_discriminado_centavos: d.iva,
-        percepciones_centavos: d.percepciones, monto_total_centavos: d.total, observaciones: g("#ff-obs").value,
+        percepciones_centavos: d.percepciones, otros_impuestos_centavos: d.otrosImpuestos,
+        monto_total_centavos: d.total, observaciones: g("#ff-obs").value,
       });
       cerrarModal();
       if (onDone) await onDone();

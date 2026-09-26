@@ -119,6 +119,7 @@ create table if not exists facturas (
   neto_gravado_centavos       bigint not null default 0 check (neto_gravado_centavos >= 0),
   iva_discriminado_centavos   bigint not null default 0 check (iva_discriminado_centavos >= 0),
   percepciones_centavos       bigint not null default 0 check (percepciones_centavos >= 0),
+  otros_impuestos_centavos    bigint not null default 0 check (otros_impuestos_centavos >= 0),
   monto_total_centavos        bigint not null default 0 check (monto_total_centavos >= 0),
   saldo_pendiente_centavos    bigint not null default 0 check (saldo_pendiente_centavos >= 0),
   estado                      varchar(20) not null default 'pendiente'
@@ -132,12 +133,22 @@ create table if not exists facturas (
   -- Cuadratura obligatoria (Sección 5.4 de la app).
   constraint chk_cuadratura_factura
     check (neto_gravado_centavos + iva_discriminado_centavos
-           + percepciones_centavos = monto_total_centavos)
+           + percepciones_centavos + otros_impuestos_centavos = monto_total_centavos)
 );
 create index if not exists ix_facturas_empresa on facturas(empresa_id);
 create index if not exists ix_facturas_proveedor on facturas(proveedor_id);
 create index if not exists ix_facturas_pendientes
   on facturas(proveedor_id, fecha_emision) where saldo_pendiente_centavos > 0;
+
+-- Migración idempotente: instalaciones existentes (tabla `facturas` ya creada
+-- sin esta columna) reciben `otros_impuestos_centavos` (impuesto interno u
+-- otros cargos no recuperables, ej. bebidas alcohólicas) y la cuadratura se
+-- amplía para contemplarla. No-op en instalaciones nuevas.
+alter table facturas add column if not exists otros_impuestos_centavos bigint not null default 0 check (otros_impuestos_centavos >= 0);
+alter table facturas drop constraint if exists chk_cuadratura_factura;
+alter table facturas add constraint chk_cuadratura_factura
+  check (neto_gravado_centavos + iva_discriminado_centavos
+         + percepciones_centavos + otros_impuestos_centavos = monto_total_centavos);
 
 create table if not exists pagos (
   id                      uuid primary key default uuid_generate_v4(),

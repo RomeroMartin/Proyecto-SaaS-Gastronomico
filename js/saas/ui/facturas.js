@@ -95,7 +95,9 @@ function formNuevaFactura() {
             <input id="fac-neto" placeholder="0,00" /></div>
           <div>${labelInfo("fac-percep", "Percepciones ($)", "Percepciones de IVA/IIBB (opcional). Se pagan pero no son costo ni crédito fiscal.")}
             <input id="fac-percep" placeholder="0,00" /></div>
-          <div>${labelInfo("fac-total", "Total ($)", "Importe final a pagar (neto + IVA + percepciones). Es lo que va a la cuenta corriente.")}
+          <div>${labelInfo("fac-otros", "Imp. interno / otros ($)", "Impuesto interno u otros cargos no recuperables (opcional). Ej: impuesto interno a bebidas alcohólicas. Se paga y NO es crédito fiscal.")}
+            <input id="fac-otros" placeholder="0,00" /></div>
+          <div>${labelInfo("fac-total", "Total ($)", "Importe final a pagar (neto + IVA + percepciones + otros impuestos). Es lo que va a la cuenta corriente.")}
             <input id="fac-total" placeholder="0,00" /></div>
         </div>
         <p id="fac-desglose" class="muted" style="margin-top:8px;"></p>
@@ -122,6 +124,7 @@ function wireForm(container) {
   total.addEventListener("input", () => { ladoEditado = "total"; recomputar(container); });
   $(container, "#fac-alicuota").addEventListener("change", () => recomputar(container));
   $(container, "#fac-percep").addEventListener("input", () => recomputar(container));
+  $(container, "#fac-otros").addEventListener("input", () => recomputar(container));
   const addBtn = $(container, "#fac-add-item");
   if (addBtn) addBtn.addEventListener("click", () => $(container, "#fac-items").appendChild(filaItem()));
   $(container, "#form-factura").addEventListener("submit", (e) => guardar(e, container));
@@ -177,8 +180,9 @@ function costoItem(row) {
 function desgloseActual(container) {
   const alicuota = Number($(container, "#fac-alicuota").value) || 0;
   const percep = pesosACentavos($(container, "#fac-percep").value);
+  const otros = pesosACentavos($(container, "#fac-otros").value);
   const monto = pesosACentavos($(container, ladoEditado === "neto" ? "#fac-neto" : "#fac-total").value);
-  return desglosarFactura({ desde: ladoEditado, montoCentavos: monto, alicuota, percepcionesCentavos: percep });
+  return desglosarFactura({ desde: ladoEditado, montoCentavos: monto, alicuota, percepcionesCentavos: percep, otrosImpuestosCentavos: otros });
 }
 
 function recomputar(container) {
@@ -189,7 +193,8 @@ function recomputar(container) {
 
   $(container, "#fac-desglose").innerHTML =
     `Neto ${formatearCentavos(d.neto)} · IVA ${formatearCentavos(d.iva)} · ` +
-    `Percep. ${formatearCentavos(d.percepciones)} · <strong>Total ${formatearCentavos(d.total)}</strong>`;
+    `Percep. ${formatearCentavos(d.percepciones)} · Otros imp. ${formatearCentavos(d.otrosImpuestos)} · ` +
+    `<strong>Total ${formatearCentavos(d.total)}</strong>`;
 }
 
 async function refrescarLista(container) {
@@ -243,6 +248,7 @@ async function guardar(e, container) {
       neto_gravado_centavos: d.neto,
       iva_discriminado_centavos: d.iva,
       percepciones_centavos: d.percepciones,
+      otros_impuestos_centavos: d.otrosImpuestos,
       monto_total_centavos: d.total,
       observaciones: $(container, "#fac-obs").value,
     });

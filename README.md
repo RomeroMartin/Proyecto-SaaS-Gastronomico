@@ -75,6 +75,10 @@ En resumen:
    (con tu email y el nombre de tu empresa) para quedar como ADMIN.
 5. Pegar **Project URL** y **publishable key** en `js/config/supabase.js`.
 
+> **¿Ya tenías el proyecto corriendo antes de esta versión?** Además de lo de
+> arriba, corré una vez `supabase/migracion_impuesto_interno.sql` (agrega el
+> campo de impuesto interno / otros impuestos no recuperables a Facturas).
+
 ### 2. Correr los tests del núcleo
 
 ```bash
