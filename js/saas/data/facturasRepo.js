@@ -62,7 +62,14 @@ export async function crear(datos) {
     p_total_centavos: datos.monto_total_centavos,
     p_sucursal_id: datos.sucursal_id || null,
     p_observaciones: (datos.observaciones || "").trim() || null,
+    p_otros_impuestos_centavos: datos.otros_impuestos_centavos || 0,
   });
   if (error) throw error;
   return data;
+}
+
+/** Anula una factura sin pagos imputados, por contraasiento (Regla 3.4). */
+export async function anular(facturaId) {
+  const { error } = await supabase.rpc("anular_factura", { p_factura_id: facturaId });
+  if (error) throw error;
 }

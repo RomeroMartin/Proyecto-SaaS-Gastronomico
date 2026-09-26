@@ -281,12 +281,16 @@ async function pintarFicha(body, id) {
   const totalPagado = pagos.filter((p) => p.estado === "activo").reduce((a, p) => a + (Number(p.monto_pagado_centavos) || 0), 0);
   const sec = rubrosSecundariosDe(prov);
 
-  const filasFac = facturas.length ? facturas.map((f) => `<tr>
+  const filasFac = facturas.length ? facturas.map((f) => {
+    const puedeAnular = f.estado !== "anulada" && Number(f.saldo_pendiente_centavos) === Number(f.monto_total_centavos);
+    return `<tr>
       <td>${escapar(f.fecha_emision)}<div class="muted" style="font-size:11px;">${escapar(f.estado)}</div></td>
       <td>${escapar(f.tipo_comprobante)} ${escapar(f.numero_factura || "")}</td>
       <td class="num">${formatearCentavos(f.monto_total_centavos)}</td>
       <td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td>
-    </tr>`).join("") : `<tr><td colspan="4" class="muted">Sin facturas.</td></tr>`;
+      <td style="text-align:right;">${puedeAnular ? `<button class="btn-baja ficha-anular-factura" data-id="${f.id}">Anular</button>` : ""}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="5" class="muted">Sin facturas.</td></tr>`;
 
   const filasPag = pagos.length ? pagos.map((p) => `<tr>
       <td>${escapar(p.fecha_pago)}<div class="muted" style="font-size:11px;">${escapar(p.referencia || "")}</div></td>
@@ -317,9 +321,9 @@ async function pintarFicha(body, id) {
 
   const panelFacturas = `
     <div class="tabla-scroll"><table>
-      <thead><tr><th>Fecha</th><th>Comprobante</th><th class="num">Total</th><th class="num">Saldo</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Comprobante</th><th class="num">Total</th><th class="num">Saldo</th><th></th></tr></thead>
       <tbody>${filasFac}</tbody>
-      <tfoot><tr><td colspan="2">Total facturado</td><td class="num">${formatearCentavos(totalFacturado)}</td><td></td></tr></tfoot>
+      <tfoot><tr><td colspan="2">Total facturado</td><td class="num">${formatearCentavos(totalFacturado)}</td><td></td><td></td></tr></tfoot>
     </table></div>`;
   const panelPagos = `
     <div class="tabla-scroll"><table>
@@ -343,6 +347,7 @@ async function pintarFicha(body, id) {
     const cont = body.querySelector("#ficha-tab-content");
     cont.innerHTML = tab === "pagos" ? panelPagos : tab === "resumen" ? panelResumen : panelFacturas;
     cont.querySelectorAll(".ficha-anular").forEach((b) => b.addEventListener("click", () => anularPago(b.dataset.id, id)));
+    cont.querySelectorAll(".ficha-anular-factura").forEach((b) => b.addEventListener("click", () => anularFactura(b.dataset.id, id)));
   }
   body.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
     body.querySelectorAll(".tab").forEach((x) => x.classList.remove("activo"));
@@ -369,6 +374,12 @@ async function anularPago(pagoId, provId) {
   catch (err) { toast("Error: " + (err.message || err), "error"); }
 }
 
+async function anularFactura(facturaId, provId) {
+  if (!(await confirmar({ titulo: "Anular factura", mensaje: "Se revierte la deuda que generó. La factura queda anulada (no se borra ni se edita). Para corregirla, cargá de nuevo con los datos correctos.", textoOk: "Anular", peligro: true }))) return;
+  try { await facturasRepo.anular(facturaId); await reabrirFicha(provId); toast("Factura anulada ✔"); }
+  catch (err) { toast("Error: " + (err.message || err), "error"); }
+}
+
 // ---------- modal: cargar factura ----------
 function modalFactura(prov, onDone) {
   const body = abrirModal(`Cargar factura — ${prov.nombre}`);
@@ -386,7 +397,8 @@ function modalFactura(prov, onDone) {
       <div class="fila">
         <div>${labelInfo("ff-ali", "Alícuota", "IVA de la factura.")}<select id="ff-ali">${ivaOpts}</select></div>
         <div>${labelInfo("ff-neto", "Neto ($)", "Sin IVA. Se completa solo si cargás el total.")}<input id="ff-neto" placeholder="0,00" /></div>
-        <div>${labelInfo("ff-percep", "Percepciones ($)", "Opcional.")}<input id="ff-percep" placeholder="0,00" /></div>
+        <div>${labelInfo("ff-percep", "Percepciones ($)", "IVA/IIBB. Opcional.")}<input id="ff-percep" placeholder="0,00" /></div>
+        <div>${labelInfo("ff-otros", "Imp. interno / otros ($)", "Impuesto interno u otros cargos no recuperables (ej. bebidas alcohólicas). Opcional.")}<input id="ff-otros" placeholder="0,00" /></div>
         <div>${labelInfo("ff-total", "Total ($)", "Lo que va a la cuenta corriente.")}<input id="ff-total" placeholder="0,00" /></div>
       </div>
       <p id="ff-desg" class="muted" style="margin-top:8px;"></p>
@@ -400,17 +412,19 @@ function modalFactura(prov, onDone) {
   const desglose = () => desglosarFactura({
     desde: lado, montoCentavos: pesosACentavos(g(lado === "neto" ? "#ff-neto" : "#ff-total").value),
     alicuota: Number(g("#ff-ali").value) || 0, percepcionesCentavos: pesosACentavos(g("#ff-percep").value),
+    otrosImpuestosCentavos: pesosACentavos(g("#ff-otros").value),
   });
   const recomputar = () => {
     const d = desglose();
     if (lado === "neto") g("#ff-total").value = formatearCentavos(d.total, { simbolo: false });
     else g("#ff-neto").value = formatearCentavos(d.neto, { simbolo: false });
-    g("#ff-desg").innerHTML = `Neto ${formatearCentavos(d.neto)} · IVA ${formatearCentavos(d.iva)} · Percep. ${formatearCentavos(d.percepciones)} · <strong>Total ${formatearCentavos(d.total)}</strong>`;
+    g("#ff-desg").innerHTML = `Neto ${formatearCentavos(d.neto)} · IVA ${formatearCentavos(d.iva)} · Percep. ${formatearCentavos(d.percepciones)} · Otros imp. ${formatearCentavos(d.otrosImpuestos)} · <strong>Total ${formatearCentavos(d.total)}</strong>`;
   };
   g("#ff-neto").addEventListener("input", () => { lado = "neto"; recomputar(); });
   g("#ff-total").addEventListener("input", () => { lado = "total"; recomputar(); });
   g("#ff-ali").addEventListener("change", recomputar);
   g("#ff-percep").addEventListener("input", recomputar);
+  g("#ff-otros").addEventListener("input", recomputar);
   g("#ff-cancelar").addEventListener("click", cerrarModal);
 
   g("#ff").addEventListener("submit", async (e) => {
@@ -424,7 +438,8 @@ function modalFactura(prov, onDone) {
         proveedor_id: prov.id, tipo_comprobante: g("#ff-tipo").value, numero_factura: g("#ff-num").value,
         fecha_emision: g("#ff-emi").value || hoy(), fecha_vencimiento: g("#ff-venc").value || null,
         neto_gravado_centavos: d.neto, iva_discriminado_centavos: d.iva,
-        percepciones_centavos: d.percepciones, monto_total_centavos: d.total, observaciones: g("#ff-obs").value,
+        percepciones_centavos: d.percepciones, otros_impuestos_centavos: d.otrosImpuestos,
+        monto_total_centavos: d.total, observaciones: g("#ff-obs").value,
       });
       cerrarModal();
       if (onDone) await onDone();

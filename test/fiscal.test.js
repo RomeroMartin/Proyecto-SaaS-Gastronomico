@@ -30,7 +30,7 @@ test("netoATotal y totalANeto son inversos (21%)", () => {
 
 test("desglosarFactura desde neto", () => {
   const r = desglosarFactura({ desde: "neto", montoCentavos: 100000, alicuota: 21 });
-  assert.deepEqual(r, { neto: 100000, iva: 21000, percepciones: 0, total: 121000 });
+  assert.deepEqual(r, { neto: 100000, iva: 21000, percepciones: 0, otrosImpuestos: 0, total: 121000 });
 });
 
 test("desglosarFactura desde total con percepciones cierra exacto", () => {
@@ -41,7 +41,7 @@ test("desglosarFactura desde total con percepciones cierra exacto", () => {
     percepcionesCentavos: 4000,
   });
   // La cuadratura debe cerrar SIEMPRE (el IVA absorbe el redondeo)
-  assert.equal(r.neto + r.iva + r.percepciones, r.total);
+  assert.equal(r.neto + r.iva + r.percepciones + r.otrosImpuestos, r.total);
   assert.equal(r.total, 125000);
   assert.equal(r.percepciones, 4000);
 });
@@ -53,7 +53,33 @@ test("desglosarFactura desde neto con percepciones", () => {
     alicuota: 21,
     percepcionesCentavos: 0,
   });
-  assert.equal(r.neto + r.iva + r.percepciones, r.total);
+  assert.equal(r.neto + r.iva + r.percepciones + r.otrosImpuestos, r.total);
+});
+
+test("desglosarFactura con impuesto interno (otrosImpuestos), desde neto", () => {
+  const r = desglosarFactura({
+    desde: "neto",
+    montoCentavos: 100000,
+    alicuota: 21,
+    percepcionesCentavos: 3000,
+    otrosImpuestosCentavos: 15000,
+  });
+  // 100000 neto + 21000 IVA + 3000 percep + 15000 imp. interno
+  assert.equal(r.iva, 21000);
+  assert.equal(r.otrosImpuestos, 15000);
+  assert.equal(r.total, 139000);
+});
+
+test("desglosarFactura con impuesto interno, desde total cierra exacto", () => {
+  const r = desglosarFactura({
+    desde: "total",
+    montoCentavos: 139000,
+    alicuota: 21,
+    percepcionesCentavos: 3000,
+    otrosImpuestosCentavos: 15000,
+  });
+  assert.equal(r.neto + r.iva + r.percepciones + r.otrosImpuestos, r.total);
+  assert.equal(r.neto, 100000);
 });
 
 test("validarCuadraturaFactura detecta descuadre", () => {
@@ -74,4 +100,13 @@ test("validarCuadraturaFactura detecta descuadre", () => {
   });
   assert.equal(mal.ok, false);
   assert.equal(mal.diferenciaCentavos, 9000);
+
+  const okOtros = validarCuadraturaFactura({
+    netoCentavos: 100000,
+    ivaCentavos: 21000,
+    percepcionesCentavos: 3000,
+    otrosImpuestosCentavos: 15000,
+    totalCentavos: 139000,
+  });
+  assert.equal(okOtros.ok, true);
 });

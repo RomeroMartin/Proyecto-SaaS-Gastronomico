@@ -66,9 +66,11 @@ export function totalANeto(totalCentavos, alicuota) {
 /**
  * Cálculo bidireccional para la carga de facturas (UX 7.5).
  * Contempla percepciones (anticipos de impuesto: van al total pagable pero
- * NO son costo ni crédito fiscal).
+ * NO son costo ni crédito fiscal) y otros impuestos no recuperables (p.ej.
+ * impuesto interno a bebidas alcohólicas): sí impactan el total a pagar,
+ * pero no son crédito fiscal (a diferencia del IVA).
  *
- *   total = neto + iva(neto, alícuota) + percepciones
+ *   total = neto + iva(neto, alícuota) + percepciones + otrosImpuestos
  *
  * Dado uno de los dos lados (neto o total) devuelve el desglose completo.
  *
@@ -77,40 +79,43 @@ export function totalANeto(totalCentavos, alicuota) {
  * @param {number} p.montoCentavos        el valor escrito (neto o total, en centavos)
  * @param {number} p.alicuota             (%)
  * @param {number} [p.percepcionesCentavos=0]
- * @returns {{neto:number, iva:number, percepciones:number, total:number}}
+ * @param {number} [p.otrosImpuestosCentavos=0]  impuesto interno u otros cargos no recuperables
+ * @returns {{neto:number, iva:number, percepciones:number, otrosImpuestos:number, total:number}}
  */
-export function desglosarFactura({ desde, montoCentavos, alicuota, percepcionesCentavos = 0 }) {
+export function desglosarFactura({ desde, montoCentavos, alicuota, percepcionesCentavos = 0, otrosImpuestosCentavos = 0 }) {
   const percep = Number(percepcionesCentavos) || 0;
+  const otros = Number(otrosImpuestosCentavos) || 0;
   const ali = Number(alicuota) || 0;
   let neto, iva, total;
 
   if (desde === "neto") {
     neto = Number(montoCentavos) || 0;
     iva = calcularIVA(neto, ali);
-    total = neto + iva + percep;
+    total = neto + iva + percep + otros;
   } else {
     total = Number(montoCentavos) || 0;
-    // neto = (total - percepciones) / (1 + alícuota)
-    neto = totalANeto(total - percep, ali);
-    iva = total - percep - neto; // el IVA absorbe el redondeo para que cierre exacto
+    // neto = (total - percepciones - otros impuestos) / (1 + alícuota)
+    neto = totalANeto(total - percep - otros, ali);
+    iva = total - percep - otros - neto; // el IVA absorbe el redondeo para que cierre exacto
   }
 
-  return { neto, iva, percepciones: percep, total };
+  return { neto, iva, percepciones: percep, otrosImpuestos: otros, total };
 }
 
 /**
  * Validación obligatoria al guardar una factura (Sección 5.4):
- *   neto_gravado + iva_discriminado + percepciones === monto_total
+ *   neto_gravado + iva_discriminado + percepciones + otros_impuestos === monto_total
  *
  * @param {object} f
  * @param {number} f.netoCentavos
  * @param {number} f.ivaCentavos
  * @param {number} f.percepcionesCentavos
+ * @param {number} [f.otrosImpuestosCentavos=0]
  * @param {number} f.totalCentavos
  * @returns {{ok:boolean, diferenciaCentavos:number}}
  */
-export function validarCuadraturaFactura({ netoCentavos, ivaCentavos, percepcionesCentavos, totalCentavos }) {
-  const suma = (Number(netoCentavos) || 0) + (Number(ivaCentavos) || 0) + (Number(percepcionesCentavos) || 0);
+export function validarCuadraturaFactura({ netoCentavos, ivaCentavos, percepcionesCentavos, otrosImpuestosCentavos = 0, totalCentavos }) {
+  const suma = (Number(netoCentavos) || 0) + (Number(ivaCentavos) || 0) + (Number(percepcionesCentavos) || 0) + (Number(otrosImpuestosCentavos) || 0);
   const diferencia = (Number(totalCentavos) || 0) - suma;
   return { ok: diferencia === 0, diferenciaCentavos: diferencia };
 }
