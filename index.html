@@ -95,6 +95,8 @@
     button:hover { background: #000; }
     button.secundario { background: #fff; color: var(--tinta); border-color: var(--borde); }
     button.secundario:hover { background: var(--hover); }
+    button.secundario.resaltado { background: var(--hover); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    button.secundario.resaltado:hover { background: var(--activo); }
     button.btn-baja { background: #fff; color: var(--error); border-color: var(--borde); padding: 4px 10px; font-weight: 500; font-size: 13px; }
     button.btn-baja:hover { background: #fef2f2; border-color: #fecaca; }
     .fila { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
@@ -156,6 +158,18 @@
     .dos-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
     @media (max-width: 640px) { .dos-col { grid-template-columns: 1fr; } }
     tfoot td { font-weight: 700; border-top: 2px solid var(--borde); }
+
+    /* Tabs genéricas (fichas, secciones con vistas alternables) */
+    .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--borde); margin-bottom: 14px; }
+    .tab { background: transparent; color: var(--muted); border: 0; border-bottom: 2px solid transparent;
+      border-radius: 0; padding: 8px 12px; font-size: 13.5px; font-weight: 600; margin-bottom: -1px; }
+    .tab:hover { background: var(--hover); color: var(--tinta); }
+    .tab.activo { color: var(--tinta); border-bottom-color: var(--tinta); }
+    .resumen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 480px) { .resumen-grid { grid-template-columns: 1fr; } }
+    .resumen-box { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 16px; }
+    .resumen-box .kpi-t { font-size: 12.5px; color: var(--muted); }
+    .resumen-box .kpi-v { font-size: 22px; font-weight: 700; margin-top: 4px; letter-spacing: -.02em; }
 
     /* Toasts */
     #toast-cont { position: fixed; top: 16px; right: 16px; z-index: 80; display: flex; flex-direction: column; gap: 8px; }
