@@ -136,7 +136,7 @@ function dibujar() {
       <td>
         <div>${escapar(p.nombre)}</div>
         <div class="muted" style="font-size:12px;">${escapar(p.codigo || "")}${p.cuit ? " · " + escapar(p.cuit) : ""}</div>
-        ${sec.length ? `<div class="muted" style="font-size:11.5px;">también: ${escapar(sec.join(" · "))}</div>` : ""}
+        <div class="muted" style="font-size:11.5px;">${rubroPrincipalDe(p) !== SIN_RUBRO ? escapar(rubroPrincipalDe(p)) : ""}${sec.length ? (rubroPrincipalDe(p) !== SIN_RUBRO ? " · también: " : "también: ") + escapar(sec.join(" · ")) : ""}</div>
       </td>
       <td class="num" style="color:${saldo > 0 ? "var(--error)" : saldo < 0 ? "var(--ok)" : "var(--muted)"};font-weight:600;">${formatearCentavos(saldo)}</td>
       <td style="white-space:nowrap;text-align:right;">
@@ -303,33 +303,57 @@ async function pintarFicha(body, id) {
         <div style="font-size:20px;font-weight:700;margin-top:4px;color:${saldo > 0 ? "var(--error)" : "var(--ok)"};">Deuda: ${formatearCentavos(saldo)}</div>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="secundario" id="ficha-factura">Cargar factura</button>
+        <button class="secundario resaltado" id="ficha-factura">Cargar factura</button>
         <button id="ficha-pago">Registrar pago</button>
       </div>
     </div>
-    <div class="dos-col">
-      <div>
-        <h3 class="muted" style="margin:0 0 4px;">Facturas</h3>
-        <div class="tabla-scroll"><table>
-          <thead><tr><th>Fecha</th><th>Comprobante</th><th class="num">Total</th><th class="num">Saldo</th></tr></thead>
-          <tbody>${filasFac}</tbody>
-          <tfoot><tr><td colspan="2">Total facturado</td><td class="num">${formatearCentavos(totalFacturado)}</td><td></td></tr></tfoot>
-        </table></div>
+
+    <div class="tabs" id="ficha-tabs">
+      <button class="tab activo" data-tab="facturas">Facturas</button>
+      <button class="tab" data-tab="pagos">Pagos</button>
+      <button class="tab" data-tab="resumen">Debe / Haber</button>
+    </div>
+    <div id="ficha-tab-content"></div>`;
+
+  const panelFacturas = `
+    <div class="tabla-scroll"><table>
+      <thead><tr><th>Fecha</th><th>Comprobante</th><th class="num">Total</th><th class="num">Saldo</th></tr></thead>
+      <tbody>${filasFac}</tbody>
+      <tfoot><tr><td colspan="2">Total facturado</td><td class="num">${formatearCentavos(totalFacturado)}</td><td></td></tr></tfoot>
+    </table></div>`;
+  const panelPagos = `
+    <div class="tabla-scroll"><table>
+      <thead><tr><th>Fecha</th><th>Método</th><th class="num">Monto</th><th></th></tr></thead>
+      <tbody>${filasPag}</tbody>
+      <tfoot><tr><td>Total pagado</td><td></td><td class="num">${formatearCentavos(totalPagado)}</td><td></td></tr></tfoot>
+    </table></div>`;
+  const panelResumen = `
+    <div class="resumen-grid">
+      <div class="resumen-box">
+        <div class="kpi-t">Debe (total facturado)</div>
+        <div class="kpi-v">${formatearCentavos(totalFacturado)}</div>
       </div>
-      <div>
-        <h3 class="muted" style="margin:0 0 4px;">Pagos</h3>
-        <div class="tabla-scroll"><table>
-          <thead><tr><th>Fecha</th><th>Método</th><th class="num">Monto</th><th></th></tr></thead>
-          <tbody>${filasPag}</tbody>
-          <tfoot><tr><td>Total pagado</td><td></td><td class="num">${formatearCentavos(totalPagado)}</td><td></td></tr></tfoot>
-        </table></div>
+      <div class="resumen-box">
+        <div class="kpi-t">Haber (total pagado)</div>
+        <div class="kpi-v">${formatearCentavos(totalPagado)}</div>
       </div>
     </div>`;
+
+  function pintarTab(tab) {
+    const cont = body.querySelector("#ficha-tab-content");
+    cont.innerHTML = tab === "pagos" ? panelPagos : tab === "resumen" ? panelResumen : panelFacturas;
+    cont.querySelectorAll(".ficha-anular").forEach((b) => b.addEventListener("click", () => anularPago(b.dataset.id, id)));
+  }
+  body.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
+    body.querySelectorAll(".tab").forEach((x) => x.classList.remove("activo"));
+    b.classList.add("activo");
+    pintarTab(b.dataset.tab);
+  }));
+  pintarTab("facturas");
 
   body.querySelector("#ficha-factura").addEventListener("click", () => modalFactura(prov, () => reabrirFicha(id)));
   body.querySelector("#ficha-pago").addEventListener("click", () =>
     modalPago(prov, facturas.filter((f) => (Number(f.saldo_pendiente_centavos) || 0) > 0 && f.estado !== "anulada"), () => reabrirFicha(id)));
-  body.querySelectorAll(".ficha-anular").forEach((b) => b.addEventListener("click", () => anularPago(b.dataset.id, id)));
 }
 
 async function reabrirFicha(id) {
