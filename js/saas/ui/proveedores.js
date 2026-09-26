@@ -281,12 +281,16 @@ async function pintarFicha(body, id) {
   const totalPagado = pagos.filter((p) => p.estado === "activo").reduce((a, p) => a + (Number(p.monto_pagado_centavos) || 0), 0);
   const sec = rubrosSecundariosDe(prov);
 
-  const filasFac = facturas.length ? facturas.map((f) => `<tr>
+  const filasFac = facturas.length ? facturas.map((f) => {
+    const puedeAnular = f.estado !== "anulada" && Number(f.saldo_pendiente_centavos) === Number(f.monto_total_centavos);
+    return `<tr>
       <td>${escapar(f.fecha_emision)}<div class="muted" style="font-size:11px;">${escapar(f.estado)}</div></td>
       <td>${escapar(f.tipo_comprobante)} ${escapar(f.numero_factura || "")}</td>
       <td class="num">${formatearCentavos(f.monto_total_centavos)}</td>
       <td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td>
-    </tr>`).join("") : `<tr><td colspan="4" class="muted">Sin facturas.</td></tr>`;
+      <td style="text-align:right;">${puedeAnular ? `<button class="btn-baja ficha-anular-factura" data-id="${f.id}">Anular</button>` : ""}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="5" class="muted">Sin facturas.</td></tr>`;
 
   const filasPag = pagos.length ? pagos.map((p) => `<tr>
       <td>${escapar(p.fecha_pago)}<div class="muted" style="font-size:11px;">${escapar(p.referencia || "")}</div></td>
@@ -317,9 +321,9 @@ async function pintarFicha(body, id) {
 
   const panelFacturas = `
     <div class="tabla-scroll"><table>
-      <thead><tr><th>Fecha</th><th>Comprobante</th><th class="num">Total</th><th class="num">Saldo</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Comprobante</th><th class="num">Total</th><th class="num">Saldo</th><th></th></tr></thead>
       <tbody>${filasFac}</tbody>
-      <tfoot><tr><td colspan="2">Total facturado</td><td class="num">${formatearCentavos(totalFacturado)}</td><td></td></tr></tfoot>
+      <tfoot><tr><td colspan="2">Total facturado</td><td class="num">${formatearCentavos(totalFacturado)}</td><td></td><td></td></tr></tfoot>
     </table></div>`;
   const panelPagos = `
     <div class="tabla-scroll"><table>
@@ -343,6 +347,7 @@ async function pintarFicha(body, id) {
     const cont = body.querySelector("#ficha-tab-content");
     cont.innerHTML = tab === "pagos" ? panelPagos : tab === "resumen" ? panelResumen : panelFacturas;
     cont.querySelectorAll(".ficha-anular").forEach((b) => b.addEventListener("click", () => anularPago(b.dataset.id, id)));
+    cont.querySelectorAll(".ficha-anular-factura").forEach((b) => b.addEventListener("click", () => anularFactura(b.dataset.id, id)));
   }
   body.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
     body.querySelectorAll(".tab").forEach((x) => x.classList.remove("activo"));
@@ -366,6 +371,12 @@ async function reabrirFicha(id) {
 async function anularPago(pagoId, provId) {
   if (!(await confirmar({ titulo: "Anular pago", mensaje: "Se revierten las imputaciones y el saldo. El pago queda anulado (no se borra).", textoOk: "Anular", peligro: true }))) return;
   try { await pagosRepo.anular(pagoId); await reabrirFicha(provId); toast("Pago anulado ✔"); }
+  catch (err) { toast("Error: " + (err.message || err), "error"); }
+}
+
+async function anularFactura(facturaId, provId) {
+  if (!(await confirmar({ titulo: "Anular factura", mensaje: "Se revierte la deuda que generó. La factura queda anulada (no se borra ni se edita). Para corregirla, cargá de nuevo con los datos correctos.", textoOk: "Anular", peligro: true }))) return;
+  try { await facturasRepo.anular(facturaId); await reabrirFicha(provId); toast("Factura anulada ✔"); }
   catch (err) { toast("Error: " + (err.message || err), "error"); }
 }
 

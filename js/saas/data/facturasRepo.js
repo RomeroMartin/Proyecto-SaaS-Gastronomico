@@ -67,3 +67,9 @@ export async function crear(datos) {
   if (error) throw error;
   return data;
 }
+
+/** Anula una factura sin pagos imputados, por contraasiento (Regla 3.4). */
+export async function anular(facturaId) {
+  const { error } = await supabase.rpc("anular_factura", { p_factura_id: facturaId });
+  if (error) throw error;
+}

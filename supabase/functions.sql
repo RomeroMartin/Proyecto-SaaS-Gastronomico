@@ -88,6 +88,33 @@ end;
 $$;
 
 -- ----------------------------------------------------------------------------
+-- anular_factura — anula una factura sin pagos imputados (Regla 3.4: no se
+-- edita, se anula). Revierte la deuda que había generado en el proveedor.
+-- Si ya tiene pagos aplicados, hay que anular esos pagos primero.
+-- ----------------------------------------------------------------------------
+create or replace function anular_factura(p_factura_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_empresa uuid; v_fac facturas%rowtype;
+begin
+  v_empresa := mi_empresa();
+  if v_empresa is null then raise exception 'Usuario sin empresa.'; end if;
+  select * into v_fac from facturas where id = p_factura_id and empresa_id = v_empresa for update;
+  if not found then raise exception 'Factura inexistente.'; end if;
+  if v_fac.estado = 'anulada' then raise exception 'La factura ya está anulada.'; end if;
+  if v_fac.saldo_pendiente_centavos <> v_fac.monto_total_centavos then
+    raise exception 'No se puede anular: la factura ya tiene pagos imputados. Anulá esos pagos primero.';
+  end if;
+
+  update facturas set estado = 'anulada', saldo_pendiente_centavos = 0 where id = p_factura_id;
+
+  update proveedores
+    set saldo_total_deuda_centavos = saldo_total_deuda_centavos - v_fac.monto_total_centavos
+    where id = v_fac.proveedor_id;
+end;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- registrar_pago — imputa FIFO (o manual) a las facturas del proveedor.
 -- p_modo_imputacion: 'fifo' | 'manual'. En manual, p_factura_ids da el orden.
 -- Devuelve el id del pago. El excedente baja igual el saldo (queda a favor).
@@ -211,6 +238,7 @@ $$;
 -- ----------------------------------------------------------------------------
 grant execute on function crear_empresa_y_admin(text, text) to authenticated;
 grant execute on function crear_factura(uuid, char, text, date, date, bigint, bigint, bigint, bigint, uuid, text, bigint) to authenticated;
+grant execute on function anular_factura(uuid) to authenticated;
 grant execute on function registrar_pago(uuid, bigint, text, text, date, text, uuid[]) to authenticated;
 grant execute on function anular_pago(uuid) to authenticated;
 

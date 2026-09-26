@@ -77,7 +77,9 @@ En resumen:
 
 > **¿Ya tenías el proyecto corriendo antes de esta versión?** Además de lo de
 > arriba, corré una vez `supabase/migracion_impuesto_interno.sql` (agrega el
-> campo de impuesto interno / otros impuestos no recuperables a Facturas).
+> campo de impuesto interno / otros impuestos no recuperables a Facturas) y
+> `supabase/migracion_anular_factura.sql` (permite anular una factura mal
+> cargada, en vez de editarla).
 
 ### 2. Correr los tests del núcleo
 

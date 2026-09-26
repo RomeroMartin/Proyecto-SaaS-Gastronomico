@@ -94,6 +94,12 @@ próximas facturas a vencer.
    el costo** de esos insumos (queda en su historial) y se **recalculan las
    recetas** automáticamente.
 5. **Guardar factura:** sube la **deuda** del proveedor.
+6. **Anular:** las facturas no se editan, se anulan (Regla 3.4). Si cargaste
+   una factura con datos incorrectos (ej. te olvidaste del impuesto interno),
+   anulala desde el botón **Anular** —revierte la deuda que había generado—
+   y cargá una nueva con los datos correctos. Solo se puede anular una
+   factura que **todavía no tiene pagos imputados**; si ya tiene, primero hay
+   que anular esos pagos.
 
 ### 3.4 Pagos
 1. Elegí el **proveedor** → ves su **deuda** y las **facturas pendientes**.

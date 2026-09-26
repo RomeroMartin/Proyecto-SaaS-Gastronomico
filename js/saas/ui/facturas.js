@@ -12,7 +12,7 @@ import * as recetasRepo from "../data/recetasRepo.js";
 import { ALICUOTAS_IVA, desglosarFactura } from "../../core/fiscal.js";
 import { UNIDADES_POR_MAGNITUD, convertirAUnidadBase, costoNetoPorUnidadBase } from "../../core/unidades.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
-import { escapar, setMsg, labelInfo, iconoInfo, toast } from "./helpers.js";
+import { escapar, setMsg, labelInfo, iconoInfo, toast, confirmar } from "./helpers.js";
 
 let PERFIL = null;
 let PROVEEDORES = [];
@@ -203,7 +203,9 @@ async function refrescarLista(container) {
   try {
     const facturas = await facturasRepo.listarPorProveedor(provSel.id);
     if (!facturas.length) { cont.innerHTML = "<p class='muted'>Sin facturas todavía.</p>"; return; }
-    const filas = facturas.map((f) => `
+    const filas = facturas.map((f) => {
+      const puedeAnular = f.estado !== "anulada" && Number(f.saldo_pendiente_centavos) === Number(f.monto_total_centavos);
+      return `
       <tr>
         <td>${escapar(f.numero_factura || "—")}</td>
         <td>${escapar(f.tipo_comprobante)}</td>
@@ -211,12 +213,28 @@ async function refrescarLista(container) {
         <td class="num">${formatearCentavos(f.monto_total_centavos)}</td>
         <td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td>
         <td>${estadoPill(f.estado)}</td>
-      </tr>`).join("");
+        <td style="text-align:right;">${puedeAnular ? `<button class="btn-baja fac-anular" data-id="${f.id}">Anular</button>` : ""}</td>
+      </tr>`;
+    }).join("");
     cont.innerHTML = `<table>
-      <thead><tr><th>Número</th><th>Tipo</th><th>Emisión</th><th class="num">Total</th><th class="num">Saldo</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Número</th><th>Tipo</th><th>Emisión</th><th class="num">Total</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead>
       <tbody>${filas}</tbody></table>`;
+    cont.querySelectorAll(".fac-anular").forEach((b) => b.addEventListener("click", () => anularFactura(container, b.dataset.id)));
   } catch (err) {
     cont.innerHTML = `<p class="error">Error: ${escapar(err.message || String(err))}</p>`;
+  }
+}
+
+async function anularFactura(container, facturaId) {
+  if (!(await confirmar({ titulo: "Anular factura", mensaje: "Se revierte la deuda que generó. La factura queda anulada (no se borra ni se edita). Para corregirla, cargá de nuevo con los datos correctos.", textoOk: "Anular", peligro: true }))) return;
+  try {
+    await facturasRepo.anular(facturaId);
+    const actualizado = await proveedoresRepo.obtener(provSel.id);
+    if (actualizado) provSel.saldo_total_deuda_centavos = actualizado.saldo_total_deuda_centavos;
+    toast("Factura anulada ✔");
+    await seleccionar(container, provSel.id);
+  } catch (err) {
+    toast("Error: " + (err.message || err), "error");
   }
 }
 
