@@ -151,10 +151,11 @@ aumentos** registrados.
   calcula el **costo por unidad de uso** y lo muestra **con IVA y merma**; ese
   es el costo que usan las recetas. *(1 oz = 29,57 ml)*
 - En cada fila:
-  - **Precio:** actualización rápida del costo (por presentación o por unidad
-    base), con **variación %** en vivo. Queda en el **historial** y **recalcula
+  - **Ficha:** todos los datos + historial de precios. Desde ahí podés
+    **Editar** (todos los campos del insumo, incluido el precio de la
+    presentación) o **Actualizar precio** (cambio rápido, con **variación %**).
+    Si cambia el costo, queda en el **historial** y se **recalculan las
     recetas**.
-  - **Ficha:** todos los datos + historial de precios.
   - **Baja.**
 
 ### 4.3 Historial de precios

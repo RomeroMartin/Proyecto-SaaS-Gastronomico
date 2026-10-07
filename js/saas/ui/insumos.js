@@ -46,13 +46,12 @@ export async function montar(container, perfil) {
   await refrescar(container);
 }
 
-// ---------- nuevo insumo (modal) ----------
-function abrirNuevo() {
+// ---------- formulario de insumo (alta y edición) ----------
+function formInsumoHTML(textoGuardar) {
   const magOpts = Object.entries(MAGNITUDES).map(([k, v]) => `<option value="${k}">${v.nombre}</option>`).join("");
   const ivaOpts = ALICUOTAS_IVA.map((a) => `<option value="${a}">${a}%</option>`).join("");
   const provOpts = `<option value="">— sin proveedor —</option>` + PROVEEDORES.map((p) => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join("");
-  const body = abrirModal("Nuevo insumo", { ancho: "lg" });
-  body.innerHTML = `
+  return `
       <form id="form-insumo">
         <div class="fila">
           <div>${labelInfo("ins-nombre", "Nombre *", "Cómo llamás al insumo. Ej: Queso Mozzarella, Harina 0000.")}<input id="ins-nombre" required placeholder="Ej: Queso Mozzarella" /></div>
@@ -81,11 +80,17 @@ function abrirNuevo() {
         </div>
 
         <p id="ins-preview" class="muted" style="margin-top:10px;"></p>
-        <div style="margin-top:12px;display:flex;gap:8px;"><button type="submit">Guardar insumo</button><button type="button" id="ins-cancelar" class="secundario">Cancelar</button></div>
+        <div style="margin-top:12px;display:flex;gap:8px;"><button type="submit">${textoGuardar}</button><button type="button" id="ins-cancelar" class="secundario">Cancelar</button></div>
         <p id="ins-msg" class="msg" hidden></p>
       </form>
       ${datalist("dl-rubro-ins", catalogos.opciones("rubro"))}`;
+}
 
+/**
+ * Cablea el formulario (selects dependientes, cantidad de uso sugerida y vista
+ * previa). Con `ins` precarga los datos de un insumo existente.
+ */
+function cablearForm(body, ins) {
   const q = (sel) => body.querySelector(sel);
   const magSel = q("#ins-magnitud"), uniSel = q("#ins-pres-unidad");
   const usoMag = q("#ins-uso-mag"), usoUni = q("#ins-uso-unidad"), usoCant = q("#ins-uso-cant");
@@ -115,6 +120,41 @@ function abrirNuevo() {
   ["#ins-pres-cant", "#ins-pres-unidad", "#ins-uso-unidad"].forEach((sel) => q(sel).addEventListener("input", sincronizar));
   ["#ins-pres-precio", "#ins-iva", "#ins-factor"].forEach((sel) => q(sel).addEventListener("input", () => actualizarPreview(body)));
   sincronizar();
+
+  if (ins) {
+    const unidadUso = unidadUsoDe(ins);
+    const cantUsoBase = Number(ins.presentacion_cantidad_base) || 0;
+    const cantUso = cantUsoBase > 0 ? Number((cantUsoBase / factorAUnidadBase(unidadUso)).toFixed(4)) : "";
+    const presMag = ins.presentacion_magnitud || ins.magnitud;
+    const mismaMag = presMag === ins.magnitud;
+    const precio = Number(ins.presentacion_precio_neto_centavos) ||
+      (cantUsoBase > 0 ? Math.round((Number(ins.costo_neto_por_unidad_base_centavos) || 0) * cantUsoBase) : 0);
+    q("#ins-nombre").value = ins.nombre || "";
+    q("#ins-rubro").value = ins.rubro || "";
+    q("#ins-prov").value = ins.proveedor_habitual_id || "";
+    q("#ins-iva").value = String(Number(ins.alicuota_iva) || 0);
+    q("#ins-factor").value = String(ins.factor_correccion != null ? ins.factor_correccion : 1);
+    magSel.value = presMag;
+    uniSel.innerHTML = opts(presMag);
+    usoMag.value = ins.magnitud;
+    usoUni.innerHTML = opts(ins.magnitud);
+    usoUni.value = unidadUso;
+    q("#ins-pres-desc").value = ins.presentacion_desc || "";
+    q("#ins-pres-cant").value = ins.presentacion_cantidad != null ? ins.presentacion_cantidad : (mismaMag ? cantUso : "");
+    uniSel.value = ins.presentacion_unidad || (mismaMag ? unidadUso : uniSel.value);
+    q("#ins-pres-precio").value = precio > 0 ? formatearCentavos(precio, { simbolo: false }) : "";
+    usoCant.value = cantUso;
+    usoMagTocada = true;
+    usoCantTocada = true;
+    actualizarPreview(body);
+  }
+}
+
+// ---------- nuevo insumo (modal) ----------
+function abrirNuevo() {
+  const body = abrirModal("Nuevo insumo", { ancho: "lg" });
+  body.innerHTML = formInsumoHTML("Guardar insumo");
+  cablearForm(body);
   body.querySelector("#form-insumo").addEventListener("submit", (e) => alta(e, body));
   body.querySelector("#ins-cancelar").addEventListener("click", cerrarModal);
   body.querySelector("#ins-nombre").focus();
@@ -160,23 +200,20 @@ async function refrescar(container) {
         <td>${escapar(i.nombre)}<div class="muted" style="font-size:11px;">${escapar(i.codigo || "")}${i.rubro ? " · " + escapar(i.rubro) : ""}</div></td>
         <td class="num">${i.presentacion_precio_neto_centavos ? formatearCentavos(i.presentacion_precio_neto_centavos) : "—"}${i.presentacion_desc ? `<div class="muted" style="font-size:11px;">${escapar(i.presentacion_desc)}</div>` : ""}</td>
         <td>${escapar(unidadUsoDe(i))}</td>
-        <td class="num">${formatearCentavos(porUnidadUso(i.costo_neto_por_unidad_base_centavos, i))}</td>
         <td class="num">${escapar(formatearPorcentaje(Number(i.alicuota_iva) || 0, 1))}</td>
         <td class="num">${formatearCentavos(porUnidadUso(conIva, i))}</td>
         <td class="muted">${fmtFecha(i.fecha_ultimo_precio)}</td>
         <td style="white-space:nowrap;text-align:right;">
-          <button class="secundario ins-precio" data-id="${i.id}">Precio</button>
           <button class="secundario ins-ficha" data-id="${i.id}">Ficha</button>
           <button class="btn-baja ins-baja" data-id="${i.id}">Baja</button>
         </td>
       </tr>`;
     }).join("");
     cont.innerHTML = `<table>
-      <thead><tr><th>Insumo</th><th class="num">Precio presentación (neto)</th><th>U. uso</th><th class="num">Costo neto / u. uso</th><th class="num">IVA</th><th class="num">Costo c/IVA / u. uso</th><th>Últ. precio</th><th></th></tr></thead>
+      <thead><tr><th>Insumo</th><th class="num">Precio presentación (neto)</th><th>U. uso</th><th class="num">IVA</th><th class="num">Costo c/IVA / u. uso</th><th>Últ. precio</th><th></th></tr></thead>
       <tbody>${filas}</tbody></table>
       <p class="muted" style="margin-top:6px;">Los costos se muestran por unidad de uso (la que leen las recetas).</p>`;
     const byId = Object.fromEntries(lista.map((i) => [i.id, i]));
-    cont.querySelectorAll(".ins-precio").forEach((b) => b.addEventListener("click", () => modalPrecio(byId[b.dataset.id])));
     cont.querySelectorAll(".ins-ficha").forEach((b) => b.addEventListener("click", () => modalFicha(byId[b.dataset.id])));
     cont.querySelectorAll(".ins-baja").forEach((b) => b.addEventListener("click", () => baja(b.dataset.id, container)));
   } catch (err) {
@@ -318,50 +355,66 @@ async function modalFicha(insumo) {
   body.querySelector("#fi-editar").addEventListener("click", () => modalEditar(insumo));
 }
 
-// ---------- editar datos ----------
+// ---------- editar insumo (todos los campos) ----------
 function modalEditar(insumo) {
-  const body = abrirModal(`Editar — ${insumo.nombre}`);
-  const ivaOpts = ALICUOTAS_IVA.map((a) => `<option value="${a}" ${Number(insumo.alicuota_iva) === a ? "selected" : ""}>${a}%</option>`).join("");
-  const provOpts = `<option value="">— sin proveedor —</option>` + PROVEEDORES.map((p) => `<option value="${p.id}" ${insumo.proveedor_habitual_id === p.id ? "selected" : ""}>${escapar(p.nombre)}</option>`).join("");
-  body.innerHTML = `
-    <form id="ie-form">
-      <div>${labelInfo("ie-nombre", "Nombre *", "")}<input id="ie-nombre" value="${escapar(insumo.nombre)}" required /></div>
-      <div class="fila">
-        <div>${labelInfo("ie-rubro", "Rubro", "")}<input id="ie-rubro" list="dl-rubro-ed" value="${escapar(insumo.rubro || "")}" /></div>
-        <div>${labelInfo("ie-iva", "Alícuota IVA", "")}<select id="ie-iva">${ivaOpts}</select></div>
-        <div>${labelInfo("ie-factor", "Factor corrección", "1 = sin pérdida.")}<input id="ie-factor" type="number" step="0.0001" value="${insumo.factor_correccion}" /></div>
-      </div>
-      <div class="fila">
-        <div>${labelInfo("ie-prov", "Proveedor habitual", "")}<select id="ie-prov">${provOpts}</select></div>
-        <div>${labelInfo("ie-uso", "Unidad de uso", "Unidad con la que se carga en recetas y se muestra el costo. No cambia el costo guardado.")}<select id="ie-uso">${(UNIDADES_POR_MAGNITUD[insumo.magnitud] || []).map((u) => `<option value="${u}" ${u === unidadUsoDe(insumo) ? "selected" : ""}>${u}</option>`).join("")}</select></div>
-      </div>
-      <div style="margin-top:14px;display:flex;gap:8px;"><button type="submit">Guardar</button>
-        <button type="button" id="ie-cancelar" class="secundario">Cancelar</button></div>
-      <p id="ie-msg" class="msg" hidden></p>
-    </form>
-    ${datalist("dl-rubro-ed", catalogos.opciones("rubro"))}`;
+  const body = abrirModal(`Editar — ${insumo.nombre}`, { ancho: "lg" });
+  body.innerHTML = formInsumoHTML("Guardar cambios");
+  cablearForm(body, insumo);
+  body.querySelector("#ins-cancelar").addEventListener("click", cerrarModal);
+  body.querySelector("#form-insumo").addEventListener("submit", (e) => guardarEdicion(e, body, insumo));
+}
 
-  body.querySelector("#ie-cancelar").addEventListener("click", cerrarModal);
-  body.querySelector("#ie-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const msg = body.querySelector("#ie-msg");
-    const nombre = body.querySelector("#ie-nombre").value.trim();
-    if (!nombre) { setMsg(msg, "El nombre es obligatorio.", "error"); return; }
-    const rubro = body.querySelector("#ie-rubro").value.trim();
-    setMsg(msg, "Guardando…");
-    try {
-      await catalogos.asegurar(PERFIL.empresa_id, "rubro", rubro);
-      await insumosRepo.actualizarMeta(insumo.id, {
-        nombre, rubro,
-        alicuota_iva: Number(body.querySelector("#ie-iva").value) || 0,
-        factor_correccion: Number(body.querySelector("#ie-factor").value) || 1,
-        proveedor_habitual_id: body.querySelector("#ie-prov").value || null,
-        unidad_uso: body.querySelector("#ie-uso").value,
+async function guardarEdicion(e, body, insumo) {
+  e.preventDefault();
+  const msg = body.querySelector("#ins-msg");
+  const nombre = body.querySelector("#ins-nombre").value.trim();
+  if (!nombre) { setMsg(msg, "El nombre es obligatorio.", "error"); return; }
+  const c = calcularCosto(body);
+  if (!c) { setMsg(msg, "Completá la presentación de compra (cantidad, unidad y precio) y la cantidad de uso.", "error"); return; }
+
+  // Cambiar la unidad base (magnitud de uso) altera el significado de las
+  // cantidades ya cargadas en recetas: avisar antes de seguir.
+  if (c.unidad_base !== insumo.unidad_base) {
+    let usadoEn = [];
+    try { usadoEn = (await recetasRepo.listar()).filter((r) => (r.ingredientes || []).some((g) => g.tipo === "insumo" && g.ref_id === insumo.id)); } catch (_e) {}
+    if (usadoEn.length) {
+      const ok = await confirmar({
+        titulo: "Cambiar magnitud de uso",
+        mensaje: `Este insumo se usa en ${usadoEn.length} receta(s) (${usadoEn.slice(0, 3).map((r) => r.nombre).join(", ")}${usadoEn.length > 3 ? "…" : ""}). Sus cantidades están en ${insumo.unidad_base}; al pasar a ${c.unidad_base} tenés que revisarlas. ¿Continuar?`,
+        textoOk: "Continuar", peligro: true,
       });
-      let n = 0; try { n = await recetasRepo.recalcularTodas(); } catch (_e) {}
-      cerrarModal();
-      toast(n ? `Insumo actualizado ✔ · ${n} receta(s) recalculada(s)` : "Insumo actualizado ✔");
-      await refrescar(CONT);
-    } catch (err) { setMsg(msg, "No se pudo guardar: " + (err.message || err), "error"); }
-  });
+      if (!ok) return;
+    }
+  }
+
+  const rubro = body.querySelector("#ins-rubro").value.trim();
+  setMsg(msg, "Guardando…");
+  try {
+    await catalogos.asegurar(PERFIL.empresa_id, "rubro", rubro);
+    await insumosRepo.actualizarMeta(insumo.id, {
+      nombre, rubro,
+      proveedor_habitual_id: body.querySelector("#ins-prov").value || null,
+      alicuota_iva: Number(body.querySelector("#ins-iva").value) || 0,
+      factor_correccion: Number(body.querySelector("#ins-factor").value) || 1,
+      magnitud: c.magnitud,
+      unidad_base: c.unidad_base,
+      unidad_uso: c.unidadUso,
+      presentacion_desc: body.querySelector("#ins-pres-desc").value.trim() || null,
+      presentacion_cantidad_base: c.cantidadBase,
+      presentacion_precio_neto_centavos: c.precioCentavos,
+      presentacion_magnitud: c.presentacion.magnitud,
+      presentacion_cantidad: c.presentacion.cantidad,
+      presentacion_unidad: c.presentacion.unidad,
+    });
+    // Si cambió el costo (precio o cantidad), queda registrado en el historial.
+    if (c.costoNetoBase !== Number(insumo.costo_neto_por_unidad_base_centavos)) {
+      await insumosRepo.actualizarCosto(PERFIL.empresa_id, insumo.id, c.costoNetoBase, {
+        origen: "manual", presentacion_precio_neto_centavos: c.precioCentavos,
+      });
+    }
+    let n = 0; try { n = await recetasRepo.recalcularTodas(); } catch (_e) {}
+    cerrarModal();
+    toast(n ? `Insumo actualizado ✔ · ${n} receta(s) recalculada(s)` : "Insumo actualizado ✔");
+    await refrescar(CONT);
+  } catch (err) { setMsg(msg, "No se pudo guardar: " + (err.message || err), "error"); }
 }
