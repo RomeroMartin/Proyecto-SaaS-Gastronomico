@@ -1,0 +1,40 @@
+name: Supabase heartbeat
+
+# Hace una consulta liviana a la base de datos para que Supabase (plan free)
+# no pause el proyecto por 7 dias de inactividad.
+
+on:
+  schedule:
+    - cron: '41 12 * * *' # todos los dias, 12:41 UTC
+  workflow_dispatch: # permite correrlo a mano desde la pestana Actions
+
+permissions:
+  actions: write # necesario para que el workflow se reactive a si mismo
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      # GitHub desactiva los workflows programados tras 60 dias sin actividad
+      # en el repo. Reactivarlo cada dia reinicia ese contador.
+      - name: Mantener activo este workflow
+        run: gh workflow enable supabase-heartbeat.yml --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Consultar la base de datos
+        run: |
+          status=$(curl -s -o response.json -w '%{http_code}' \
+            "$SUPABASE_URL/rest/v1/empresas?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+          echo "HTTP $status"
+          cat response.json
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "El ping a Supabase fallo"
+            exit 1
+          fi
+        env:
+          SUPABASE_URL: https://jcumjycveeemgcfxqydd.supabase.co
+          # Es la misma clave publica (publishable) que ya esta en js/config/supabase.js
+          SUPABASE_KEY: sb_publishable_rPhnKUEqQCpktTCR8-2Waw_RN1XhTjl
