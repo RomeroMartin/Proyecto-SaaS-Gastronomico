@@ -125,9 +125,14 @@ export async function actualizarCosto(empresaId, id, nuevoCostoCentavos, meta = 
   return variacion;
 }
 
-/** Edita metadatos que NO tocan el precio (no escribe historial). */
+/** Edita datos del insumo. El costo por unidad base va por actualizarCosto (con historial). */
 export async function actualizarMeta(id, datos) {
-  const permitidos = ["nombre", "rubro", "alicuota_iva", "factor_correccion", "proveedor_habitual_id", "unidad_uso"];
+  const permitidos = [
+    "nombre", "rubro", "alicuota_iva", "factor_correccion", "proveedor_habitual_id",
+    "magnitud", "unidad_base", "unidad_uso",
+    "presentacion_desc", "presentacion_cantidad_base", "presentacion_precio_neto_centavos",
+    "presentacion_magnitud", "presentacion_cantidad", "presentacion_unidad",
+  ];
   const payload = {};
   for (const k of permitidos) if (k in datos) payload[k] = datos[k];
   payload.modificado_en = new Date().toISOString();
