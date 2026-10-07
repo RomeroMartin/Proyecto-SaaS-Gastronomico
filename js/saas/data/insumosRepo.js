@@ -60,6 +60,10 @@ export async function crear(empresaId, datos) {
     presentacion_desc: (datos.presentacion_desc || "").trim() || null,
     presentacion_cantidad_base: datos.presentacion_cantidad_base || null,
     presentacion_precio_neto_centavos: datos.presentacion_precio_neto_centavos || null,
+    presentacion_magnitud: datos.presentacion_magnitud || null,
+    presentacion_cantidad: datos.presentacion_cantidad || null,
+    presentacion_unidad: datos.presentacion_unidad || null,
+    unidad_uso: datos.unidad_uso || null,
     proveedor_habitual_id: datos.proveedor_habitual_id || null,
     fecha_ultimo_precio: new Date().toISOString(),
     creado_por: creadoPor,
@@ -88,17 +92,23 @@ export async function crear(empresaId, datos) {
  */
 export async function actualizarCosto(empresaId, id, nuevoCostoCentavos, meta = {}) {
   const { data: actual } = await supabase
-    .from("insumos").select("costo_neto_por_unidad_base_centavos").eq("id", id).maybeSingle();
+    .from("insumos").select("costo_neto_por_unidad_base_centavos, presentacion_cantidad_base").eq("id", id).maybeSingle();
   const anterior = actual ? Number(actual.costo_neto_por_unidad_base_centavos) || 0 : 0;
   const variacion = anterior > 0 ? ((nuevoCostoCentavos - anterior) / anterior) * 100 : 0;
 
   const { data: userData } = await supabase.auth.getUser();
   const usuario = userData && userData.user ? userData.user.id : null;
 
-  const { error } = await supabase.from("insumos").update({
+  const cambios = {
     costo_neto_por_unidad_base_centavos: nuevoCostoCentavos,
     fecha_ultimo_precio: new Date().toISOString(),
-  }).eq("id", id);
+  };
+  // Mantiene al día el precio de la presentación (botella, caja…): el exacto si
+  // se conoce, o el derivado del nuevo costo por unidad base.
+  const cantPres = actual ? Number(actual.presentacion_cantidad_base) || 0 : 0;
+  if (meta.presentacion_precio_neto_centavos > 0) cambios.presentacion_precio_neto_centavos = meta.presentacion_precio_neto_centavos;
+  else if (cantPres > 0) cambios.presentacion_precio_neto_centavos = Math.round(nuevoCostoCentavos * cantPres);
+  const { error } = await supabase.from("insumos").update(cambios).eq("id", id);
   if (error) throw error;
 
   await supabase.from("historial_precios_insumo").insert({
@@ -117,7 +127,7 @@ export async function actualizarCosto(empresaId, id, nuevoCostoCentavos, meta = 
 
 /** Edita metadatos que NO tocan el precio (no escribe historial). */
 export async function actualizarMeta(id, datos) {
-  const permitidos = ["nombre", "rubro", "alicuota_iva", "factor_correccion", "proveedor_habitual_id"];
+  const permitidos = ["nombre", "rubro", "alicuota_iva", "factor_correccion", "proveedor_habitual_id", "unidad_uso"];
   const payload = {};
   for (const k of permitidos) if (k in datos) payload[k] = datos[k];
   payload.modificado_en = new Date().toISOString();

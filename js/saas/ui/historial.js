@@ -4,6 +4,7 @@
 
 import * as insumosRepo from "../data/insumosRepo.js";
 import * as proveedoresRepo from "../data/proveedoresRepo.js";
+import { factorAUnidadBase } from "../../core/unidades.js";
 import { formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
 import { escapar } from "./helpers.js";
 
@@ -11,6 +12,9 @@ let INSUMOS = [];
 let PROVEEDORES = [];
 let SELECCIONADO = null;
 const $ = (c, s) => c.querySelector(s);
+/** Factor para mostrar el costo (guardado por unidad base) en la unidad de uso. */
+const factorUso = (i) => factorAUnidadBase(i.unidad_uso || i.unidad_base);
+const unidadUso = (i) => i.unidad_uso || i.unidad_base;
 const fmtFecha = (iso) => (iso ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(iso)) : "—");
 
 export async function montar(container) {
@@ -69,7 +73,7 @@ function dibujarLista(container) {
   cont.innerHTML = `<table><tbody>${lista.map((i) => `
     <tr class="hp-fila" data-id="${i.id}" style="cursor:pointer;${i.id === SELECCIONADO ? "background:var(--hover);" : ""}">
       <td>${escapar(i.nombre)}<div class="muted" style="font-size:11px;">${escapar(i.codigo || "")}${i.rubro ? " · " + escapar(i.rubro) : ""}</div></td>
-      <td class="num">${formatearCentavos(i.costo_neto_por_unidad_base_centavos || 0)} <span class="muted">/ ${escapar(i.unidad_base)}</span></td>
+      <td class="num">${formatearCentavos((i.costo_neto_por_unidad_base_centavos || 0) * factorUso(i))} <span class="muted">/ ${escapar(unidadUso(i))}</span></td>
       <td class="muted">${fmtFecha(i.fecha_ultimo_precio)}</td>
     </tr>`).join("")}</tbody></table>`;
   cont.querySelectorAll(".hp-fila").forEach((tr) => tr.addEventListener("click", () => {
@@ -95,7 +99,7 @@ async function seleccionar(container, id) {
 
   const filas = [...hist].reverse().map((h) => `<tr>
     <td>${fmtFecha(h.fecha)}</td>
-    <td class="num">${formatearCentavos(h.costo_nuevo_centavos)}</td>
+    <td class="num">${formatearCentavos(h.costo_nuevo_centavos * factorUso(insumo))}</td>
     <td class="num" style="color:${h.variacion_porcentual > 0 ? "var(--error)" : h.variacion_porcentual < 0 ? "var(--ok)" : "var(--muted)"};">
       ${h.variacion_porcentual > 0 ? "+" : ""}${escapar(formatearPorcentaje(h.variacion_porcentual))}</td>
     <td class="muted">${escapar(h.origen)}</td>
@@ -106,12 +110,12 @@ async function seleccionar(container, id) {
       <div class="topbar"><h2 style="margin:0;">${escapar(insumo.nombre)}</h2>
         <div class="muted">Variación total:
           <strong style="color:${variacionTotal > 0 ? "var(--error)" : "var(--ok)"};">${variacionTotal > 0 ? "+" : ""}${escapar(formatearPorcentaje(variacionTotal))}</strong>
-          <span style="font-size:12px;">(${formatearCentavos(primero)} → ${formatearCentavos(ultimo)} por ${escapar(insumo.unidad_base)})</span>
+          <span style="font-size:12px;">(${formatearCentavos(primero * factorUso(insumo))} → ${formatearCentavos(ultimo * factorUso(insumo))} por ${escapar(unidadUso(insumo))})</span>
         </div>
       </div>
       ${grafico(hist)}
       <div class="tabla-scroll" style="margin-top:12px;"><table>
-        <thead><tr><th>Fecha</th><th class="num">Costo (${escapar(insumo.unidad_base)})</th><th class="num">Variación</th><th>Origen</th></tr></thead>
+        <thead><tr><th>Fecha</th><th class="num">Costo (${escapar(unidadUso(insumo))})</th><th class="num">Variación</th><th>Origen</th></tr></thead>
         <tbody>${filas}</tbody></table></div>
     </div>`;
 }

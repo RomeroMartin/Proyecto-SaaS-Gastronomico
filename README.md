@@ -79,7 +79,8 @@ En resumen:
 > arriba, corré una vez `supabase/migracion_impuesto_interno.sql` (agrega el
 > campo de impuesto interno / otros impuestos no recuperables a Facturas) y
 > `supabase/migracion_anular_factura.sql` (permite anular una factura mal
-> cargada, en vez de editarla) y `supabase/migracion_razon_social.sql` (agrega
+> cargada, en vez de editarla) `supabase/migracion_unidad_uso.sql` (unidad de uso de los insumos: costos y
+> recetas en oz/cc/ml…) y `supabase/migracion_razon_social.sql` (agrega
 > la **razón social** del proveedor; el campo "nombre" pasa a ser el nombre de fantasía).
 
 ### 2. Correr los tests del núcleo

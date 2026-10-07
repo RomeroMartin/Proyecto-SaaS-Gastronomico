@@ -90,7 +90,8 @@ próximas facturas a vencer.
    recuperables, ej. bebidas alcohólicas). Abajo ves el desglose completo
    (neto · IVA · percep · otros imp. · total).
 4. **(Opcional) Actualizar costos de insumos de esta compra:** agregás filas
-   con **insumo + cantidad + unidad + precio neto**. Al guardar, se **actualiza
+   con **insumo + cantidad + unidad + precio neto** (la unidad puede ser la
+   propia presentación, ej. *2 Botellas*). Al guardar, se **actualiza
    el costo** de esos insumos (queda en su historial) y se **recalculan las
    recetas** automáticamente.
 5. **Guardar factura:** sube la **deuda** del proveedor.
@@ -139,11 +140,16 @@ Cantidad de insumos, **precios desactualizados** (+30 días) y **últimos
 aumentos** registrados.
 
 ### 4.2 Insumos
-- **Nuevo insumo:** nombre, rubro, **proveedor habitual**, **magnitud**
-  (masa/volumen/unidad), alícuota de IVA y **factor de corrección**.
-- **Presentación de compra:** cómo lo comprás (ej: *Barra 5 kg*), cantidad,
-  unidad y **precio neto**. La app calcula solo el **costo por unidad base**
-  (por gramo/ml/unidad) y muestra el costo **con IVA y merma**.
+- **Nuevo insumo:** nombre, rubro, **proveedor habitual**, **magnitud de
+  compra** (masa/volumen/unidad), alícuota de IVA y **factor de corrección**.
+- **Presentación de compra:** cómo lo comprás (ej: *Botella*), cantidad,
+  unidad y **precio neto** de esa presentación.
+- **Unidad de uso:** cómo lo usás en las recetas. Elegís la **magnitud de uso**,
+  la **unidad de uso** (ml, cc, l, **oz**, g…) y **cuántas unidades de uso trae
+  la presentación** (ej: botella de Fernet → volumen, oz, 33,8). Si la magnitud
+  de uso es la misma que la de compra, la cantidad se calcula sola. La app
+  calcula el **costo por unidad de uso** y lo muestra **con IVA y merma**; ese
+  es el costo que usan las recetas. *(1 oz = 29,57 ml)*
 - En cada fila:
   - **Precio:** actualización rápida del costo (por presentación o por unidad
     base), con **variación %** en vivo. Queda en el **historial** y **recalcula
@@ -168,7 +174,8 @@ El **recetario / fichas técnicas**.
 - **Plato:** se vende (tiene precio de carta y sector).
 - **Preparación:** una sub-receta (ej: una salsa) que se usa dentro de otras.
 - **Ingredientes:** agregás **insumos** y/o **preparaciones**, con su cantidad.
-  Ves el **costo de cada línea** y el **costo total** en vivo.
+  Para los insumos podés elegir la unidad (por defecto, la de uso: ej. oz; o
+  cc, ml…) y se convierte sola. Ves el **costo de cada línea** y el **costo total** en vivo.
 - Para platos: **food cost %**, **margen** y una **calculadora inversa**
   ("¿a qué precio vender para un food cost del X%?").
 - Detecta **referencias circulares** entre sub-recetas y no deja guardarlas.

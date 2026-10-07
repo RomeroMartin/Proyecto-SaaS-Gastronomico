@@ -10,7 +10,7 @@ import * as proveedoresRepo from "../data/proveedoresRepo.js";
 import * as insumosRepo from "../data/insumosRepo.js";
 import * as recetasRepo from "../data/recetasRepo.js";
 import { ALICUOTAS_IVA, desglosarFactura } from "../../core/fiscal.js";
-import { UNIDADES_POR_MAGNITUD, convertirAUnidadBase, costoNetoPorUnidadBase } from "../../core/unidades.js";
+import { UNIDADES_POR_MAGNITUD, convertirAUnidadBase, factorAUnidadBase, costoNetoPorUnidadBase } from "../../core/unidades.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo, iconoInfo, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
 
@@ -20,6 +20,8 @@ let INSUMOS = [];
 let insMap = {};
 let FACTURAS = [];
 let provMap = {};
+// Valor especial del selector de unidad: "la presentación de compra" del insumo.
+const UNIDAD_PRESENTACION = "__presentacion__";
 let ladoEditado = "total"; // "neto" | "total"
 
 const hoy = () => new Date().toISOString().slice(0, 10);
@@ -227,7 +229,10 @@ function filaItem() {
   const uniSel = row.querySelector(".it-unidad");
   const poblarUni = () => {
     const ins = insMap[insSel.value];
-    uniSel.innerHTML = ins ? (UNIDADES_POR_MAGNITUD[ins.magnitud] || []).map((u) => `<option value="${u}">${u}</option>`).join("") : "";
+    // Unidades de la magnitud de uso + la presentación de compra (ej: "Botella").
+    const pres = ins && Number(ins.presentacion_cantidad_base) > 0
+      ? `<option value="${UNIDAD_PRESENTACION}">${escapar(ins.presentacion_desc || "presentación")}</option>` : "";
+    uniSel.innerHTML = ins ? pres + (UNIDADES_POR_MAGNITUD[ins.magnitud] || []).map((u) => `<option value="${u}">${u}</option>`).join("") : "";
     calcular();
   };
   const calcular = () => {
@@ -237,7 +242,7 @@ function filaItem() {
     if (!ins || nb == null) { el.textContent = ""; return; }
     const actual = ins.costo_neto_por_unidad_base_centavos || 0;
     const vari = actual > 0 ? ((nb - actual) / actual) * 100 : 0;
-    el.innerHTML = `→ ${formatearCentavos(nb)}/${escapar(ins.unidad_base)} <span style="color:${vari > 0 ? "var(--error)" : vari < 0 ? "var(--ok)" : "var(--muted)"}">(${vari > 0 ? "+" : ""}${escapar(formatearPorcentaje(vari))})</span>`;
+    el.innerHTML = `→ ${formatearCentavos(nb * factorAUnidadBase(ins.unidad_uso || ins.unidad_base))}/${escapar(ins.unidad_uso || ins.unidad_base)} <span style="color:${vari > 0 ? "var(--error)" : vari < 0 ? "var(--ok)" : "var(--muted)"}">(${vari > 0 ? "+" : ""}${escapar(formatearPorcentaje(vari))})</span>`;
   };
   insSel.addEventListener("change", poblarUni);
   uniSel.addEventListener("change", calcular);
@@ -254,7 +259,10 @@ function costoItem(row) {
   const unidad = row.querySelector(".it-unidad").value;
   const precio = pesosACentavos(row.querySelector(".it-precio").value);
   if (!ins || !cant || cant <= 0 || !unidad || precio <= 0) return null;
-  return costoNetoPorUnidadBase(precio, convertirAUnidadBase(cant, unidad));
+  const cantBase = unidad === UNIDAD_PRESENTACION
+    ? cant * Number(ins.presentacion_cantidad_base)
+    : convertirAUnidadBase(cant, unidad);
+  return costoNetoPorUnidadBase(precio, cantBase);
 }
 
 function desgloseActual(container) {

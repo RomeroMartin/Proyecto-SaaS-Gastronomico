@@ -5,6 +5,8 @@ import {
   convertirAUnidadBase,
   costoNetoPorUnidadBase,
   unidadBaseDe,
+  convertirDesdeUnidadBase,
+  factorAUnidadBase,
 } from "../js/core/unidades.js";
 
 test("unidadBaseDe devuelve la base canónica", () => {
@@ -45,4 +47,11 @@ test("costoNetoPorUnidadBase: redondea a entero de centavos", () => {
 
 test("costoNetoPorUnidadBase: cantidad base 0 lanza (evita división por cero)", () => {
   assert.throws(() => costoNetoPorUnidadBase(1000, 0));
+});
+
+test("oz (onza líquida) convierte a ml y vuelve", () => {
+  assert.equal(factorAUnidadBase("oz"), 29.5735);
+  assert.ok(Math.abs(convertirAUnidadBase(1.5, "oz") - 44.36025) < 1e-9);
+  assert.ok(Math.abs(convertirDesdeUnidadBase(59.147, "oz") - 2) < 1e-9);
+  assert.equal(convertirDesdeUnidadBase(1000, "l"), 1);
 });
