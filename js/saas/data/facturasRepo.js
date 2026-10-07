@@ -19,6 +19,17 @@ export async function listarPorProveedor(proveedorId) {
   return data || [];
 }
 
+/** Todas las facturas activas de la empresa (más recientes primero). */
+export async function listarTodas() {
+  const { data, error } = await supabase
+    .from("facturas")
+    .select("*")
+    .eq("activo", true)
+    .order("fecha_emision", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
 /** Todas las facturas con saldo pendiente (para KPIs del listado). */
 export async function pendientesGlobal() {
   const { data, error } = await supabase

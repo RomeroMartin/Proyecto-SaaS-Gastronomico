@@ -3,10 +3,13 @@
 // ============================================================
 
 import * as insumosRepo from "../data/insumosRepo.js";
+import * as proveedoresRepo from "../data/proveedoresRepo.js";
 import { formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
 import { escapar } from "./helpers.js";
 
 let INSUMOS = [];
+let PROVEEDORES = [];
+let SELECCIONADO = null;
 const $ = (c, s) => c.querySelector(s);
 const fmtFecha = (iso) => (iso ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(iso)) : "—");
 
@@ -14,20 +17,66 @@ export async function montar(container) {
   container.innerHTML = `
     <div class="card">
       <h2 style="margin-top:0;">Historial de precios</h2>
-      <label for="hp-insumo">Insumo</label>
-      <select id="hp-insumo"><option value="">— elegí un insumo —</option></select>
+      <div class="toolbar">
+        <input id="hp-buscar" type="search" placeholder="Buscar insumo por nombre o código…" style="flex:1;min-width:200px;" />
+        <select id="hp-rubro"><option value="">Todos los rubros</option></select>
+        <select id="hp-prov"><option value="">Todos los proveedores</option></select>
+        <select id="hp-orden">
+          <option value="nombre">Orden: nombre A-Z</option>
+          <option value="reciente">Orden: precio actualizado recientemente</option>
+          <option value="antiguo">Orden: precio más desactualizado</option>
+        </select>
+        <span class="cuenta" id="hp-cuenta"></span>
+      </div>
+      <div id="hp-lista" class="tabla-scroll" style="max-height:260px;overflow-y:auto;"></div>
     </div>
     <div id="hp-detalle"></div>`;
   try {
-    INSUMOS = await insumosRepo.listar();
+    [INSUMOS, PROVEEDORES] = await Promise.all([insumosRepo.listar(), proveedoresRepo.listar().catch(() => [])]);
   } catch (err) {
     $(container, "#hp-detalle").innerHTML = `<p class="error">Error: ${escapar(err.message || String(err))}</p>`;
     return;
   }
-  const sel = $(container, "#hp-insumo");
-  sel.innerHTML += INSUMOS.map((i) => `<option value="${i.id}">${escapar(i.nombre)}</option>`).join("");
-  sel.addEventListener("change", () => seleccionar(container, sel.value));
-  if (!INSUMOS.length) $(container, "#hp-detalle").innerHTML = `<div class="card"><p class="muted">No hay insumos cargados.</p></div>`;
+  SELECCIONADO = null;
+  const rubros = [...new Set(INSUMOS.map((i) => i.rubro).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  $(container, "#hp-rubro").innerHTML += rubros.map((r) => `<option value="${escapar(r)}">${escapar(r)}</option>`).join("");
+  $(container, "#hp-prov").innerHTML += PROVEEDORES.map((p) => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join("");
+  ["#hp-buscar", "#hp-rubro", "#hp-prov", "#hp-orden"].forEach((sel) =>
+    $(container, sel).addEventListener("input", () => dibujarLista(container)));
+  dibujarLista(container);
+}
+
+function dibujarLista(container) {
+  const q = ($(container, "#hp-buscar").value || "").toLowerCase().trim();
+  const rubro = $(container, "#hp-rubro").value;
+  const prov = $(container, "#hp-prov").value;
+  const orden = $(container, "#hp-orden").value;
+
+  const lista = INSUMOS.filter((i) => {
+    if (q && !((i.nombre || "").toLowerCase().includes(q) || (i.codigo || "").toLowerCase().includes(q))) return false;
+    if (rubro && i.rubro !== rubro) return false;
+    if (prov && i.proveedor_habitual_id !== prov) return false;
+    return true;
+  });
+  const t = (i) => (i.fecha_ultimo_precio ? new Date(i.fecha_ultimo_precio).getTime() : 0);
+  lista.sort((a, b) => orden === "reciente" ? t(b) - t(a) : orden === "antiguo" ? t(a) - t(b)
+    : (a.nombre || "").localeCompare(b.nombre || ""));
+
+  $(container, "#hp-cuenta").textContent = `${lista.length} de ${INSUMOS.length}`;
+  const cont = $(container, "#hp-lista");
+  if (!INSUMOS.length) { cont.innerHTML = "<p class='muted'>No hay insumos cargados.</p>"; return; }
+  if (!lista.length) { cont.innerHTML = "<p class='muted'>No hay insumos que coincidan.</p>"; return; }
+  cont.innerHTML = `<table><tbody>${lista.map((i) => `
+    <tr class="hp-fila" data-id="${i.id}" style="cursor:pointer;${i.id === SELECCIONADO ? "background:var(--hover);" : ""}">
+      <td>${escapar(i.nombre)}<div class="muted" style="font-size:11px;">${escapar(i.codigo || "")}${i.rubro ? " · " + escapar(i.rubro) : ""}</div></td>
+      <td class="num">${formatearCentavos(i.costo_neto_por_unidad_base_centavos || 0)} <span class="muted">/ ${escapar(i.unidad_base)}</span></td>
+      <td class="muted">${fmtFecha(i.fecha_ultimo_precio)}</td>
+    </tr>`).join("")}</tbody></table>`;
+  cont.querySelectorAll(".hp-fila").forEach((tr) => tr.addEventListener("click", () => {
+    SELECCIONADO = tr.dataset.id;
+    cont.querySelectorAll(".hp-fila").forEach((x) => { x.style.background = x === tr ? "var(--hover)" : ""; });
+    seleccionar(container, tr.dataset.id);
+  }));
 }
 
 async function seleccionar(container, id) {

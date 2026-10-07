@@ -12,68 +12,147 @@ import * as recetasRepo from "../data/recetasRepo.js";
 import { ALICUOTAS_IVA, desglosarFactura } from "../../core/fiscal.js";
 import { UNIDADES_POR_MAGNITUD, convertirAUnidadBase, costoNetoPorUnidadBase } from "../../core/unidades.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
-import { escapar, setMsg, labelInfo, iconoInfo, toast, confirmar } from "./helpers.js";
+import { escapar, setMsg, labelInfo, iconoInfo, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
 
 let PERFIL = null;
 let PROVEEDORES = [];
 let INSUMOS = [];
 let insMap = {};
-let provSel = null;
+let FACTURAS = [];
+let provMap = {};
 let ladoEditado = "total"; // "neto" | "total"
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 const $ = (c, s) => c.querySelector(s);
 
+const fmtFecha = (iso) => (iso ? String(iso).slice(0, 10).split("-").reverse().join("/") : "—");
+
 export async function montar(container, perfil) {
   PERFIL = perfil;
   container.innerHTML = `
     <div class="card">
-      <h2 style="margin-top:0;">Facturas de compra</h2>
-      <label for="fac-prov">Proveedor</label>
-      <select id="fac-prov"><option value="">— elegí un proveedor —</option></select>
-    </div>
-    <div id="fac-detalle"></div>`;
+      <div class="topbar">
+        <h2 style="margin:0;">Facturas de compra</h2>
+        <button id="fac-nueva">+ Nueva factura</button>
+      </div>
+      <div class="toolbar" style="margin-top:12px;">
+        <input id="fac-buscar" type="search" placeholder="Buscar por número…" />
+        <select id="fac-fprov"><option value="">Todos los proveedores</option></select>
+        <select id="fac-festado">
+          <option value="">Todos los estados</option>
+          <option value="pendiente">Pendiente</option><option value="parcial">Parcial</option>
+          <option value="pagada">Pagada</option><option value="anulada">Anulada</option>
+        </select>
+        <label style="margin:0;display:flex;align-items:center;gap:4px;">Desde <input id="fac-desde" type="date" /></label>
+        <label style="margin:0;display:flex;align-items:center;gap:4px;">Hasta <input id="fac-hasta" type="date" /></label>
+        <select id="fac-orden">
+          <option value="fecha-desc">Más recientes primero</option>
+          <option value="fecha-asc">Más antiguas primero</option>
+          <option value="monto-desc">Mayor monto</option>
+          <option value="monto-asc">Menor monto</option>
+          <option value="saldo-desc">Mayor saldo</option>
+          <option value="saldo-asc">Menor saldo</option>
+        </select>
+        <span class="cuenta" id="fac-cuenta"></span>
+      </div>
+      <div id="fac-lista" class="tabla-scroll"><p class="muted">Cargando…</p></div>
+    </div>`;
 
   try {
     [PROVEEDORES, INSUMOS] = await Promise.all([proveedoresRepo.listar(), insumosRepo.listar()]);
     insMap = Object.fromEntries(INSUMOS.map((i) => [i.id, i]));
+    provMap = Object.fromEntries(PROVEEDORES.map((p) => [p.id, p]));
   } catch (err) {
-    $(container, "#fac-detalle").innerHTML = `<p class="error">Error: ${escapar(err.message || String(err))}</p>`;
+    $(container, "#fac-lista").innerHTML = `<p class="error">Error: ${escapar(err.message || String(err))}</p>`;
     return;
   }
-  const sel = $(container, "#fac-prov");
-  sel.innerHTML += PROVEEDORES.map((p) => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join("");
-  sel.addEventListener("change", () => seleccionar(container, sel.value));
-
-  if (!PROVEEDORES.length) {
-    $(container, "#fac-detalle").innerHTML = `<div class="card"><p class="muted">Primero cargá un proveedor en el módulo Proveedores.</p></div>`;
-  }
+  $(container, "#fac-fprov").innerHTML += PROVEEDORES.map((p) => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join("");
+  ["#fac-buscar", "#fac-fprov", "#fac-festado", "#fac-desde", "#fac-hasta", "#fac-orden"].forEach((s) =>
+    $(container, s).addEventListener("input", () => dibujarLista(container)));
+  $(container, "#fac-nueva").addEventListener("click", () => abrirNueva(container));
+  await refrescarLista(container);
 }
 
-async function seleccionar(container, id) {
-  provSel = PROVEEDORES.find((p) => p.id === id) || null;
-  const det = $(container, "#fac-detalle");
-  if (!provSel) { det.innerHTML = ""; return; }
-  det.innerHTML = `
-    <div class="card">
-      <div class="topbar">
-        <h2 style="margin:0;">${escapar(provSel.nombre)}</h2>
-        <div class="muted">Deuda: <strong>${formatearCentavos(provSel.saldo_total_deuda_centavos || 0)}</strong></div>
-      </div>
-      <div id="fac-lista" class="tabla-scroll"></div>
-    </div>
-    ${formNuevaFactura()}`;
+async function refrescarLista(container) {
+  const cont = $(container, "#fac-lista");
+  try {
+    FACTURAS = await facturasRepo.listarTodas();
+  } catch (err) {
+    cont.innerHTML = `<p class="error">Error: ${escapar(err.message || String(err))}</p>`;
+    return;
+  }
+  dibujarLista(container);
+}
 
-  wireForm(container);
-  await refrescarLista(container);
+function dibujarLista(container) {
+  const cont = $(container, "#fac-lista");
+  const q = ($(container, "#fac-buscar").value || "").toLowerCase().trim();
+  const prov = $(container, "#fac-fprov").value;
+  const estado = $(container, "#fac-festado").value;
+  const desde = $(container, "#fac-desde").value;
+  const hasta = $(container, "#fac-hasta").value;
+  const [campo, sentido] = $(container, "#fac-orden").value.split("-");
+  const dir = sentido === "asc" ? 1 : -1;
+
+  const lista = FACTURAS.filter((f) => {
+    if (q && !(f.numero_factura || "").toLowerCase().includes(q)) return false;
+    if (prov && f.proveedor_id !== prov) return false;
+    if (estado && f.estado !== estado) return false;
+    const fe = String(f.fecha_emision || "").slice(0, 10);
+    if (desde && fe < desde) return false;
+    if (hasta && fe > hasta) return false;
+    return true;
+  });
+  const clave = { fecha: (f) => String(f.fecha_emision || ""), monto: (f) => Number(f.monto_total_centavos) || 0, saldo: (f) => Number(f.saldo_pendiente_centavos) || 0 }[campo];
+  lista.sort((a, b) => {
+    const x = clave(a), y = clave(b);
+    return (x < y ? -1 : x > y ? 1 : 0) * dir;
+  });
+
+  $(container, "#fac-cuenta").textContent = `${lista.length} de ${FACTURAS.length}`;
+  if (!FACTURAS.length) { cont.innerHTML = "<p class='muted'>Todavía no hay facturas. Cargá la primera con “+ Nueva factura”.</p>"; return; }
+  if (!lista.length) { cont.innerHTML = "<p class='muted'>No hay facturas que coincidan con los filtros.</p>"; return; }
+
+  const vigentes = lista.filter((f) => f.estado !== "anulada");
+  const totM = vigentes.reduce((a, f) => a + (Number(f.monto_total_centavos) || 0), 0);
+  const totS = vigentes.reduce((a, f) => a + (Number(f.saldo_pendiente_centavos) || 0), 0);
+  const filas = lista.map((f) => {
+    const puedeAnular = f.estado !== "anulada" && Number(f.saldo_pendiente_centavos) === Number(f.monto_total_centavos);
+    const p = provMap[f.proveedor_id];
+    return `
+    <tr>
+      <td>${fmtFecha(f.fecha_emision)}</td>
+      <td>${escapar(p ? p.nombre : "—")}</td>
+      <td>${escapar(f.tipo_comprobante)} ${escapar(f.numero_factura || "")}</td>
+      <td class="num">${formatearCentavos(f.monto_total_centavos)}</td>
+      <td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td>
+      <td>${estadoPill(f.estado)}</td>
+      <td style="text-align:right;">${puedeAnular ? `<button class="btn-baja fac-anular" data-id="${f.id}">Anular</button>` : ""}</td>
+    </tr>`;
+  }).join("");
+  cont.innerHTML = `<table>
+    <thead><tr><th>Emisión</th><th>Proveedor</th><th>Comprobante</th><th class="num">Total</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot><tr><td colspan="3">Totales (sin anuladas)</td><td class="num">${formatearCentavos(totM)}</td><td class="num">${formatearCentavos(totS)}</td><td colspan="2"></td></tr></tfoot></table>`;
+  cont.querySelectorAll(".fac-anular").forEach((b) => b.addEventListener("click", () => anularFactura(container, b.dataset.id)));
+}
+
+// ---------- nueva factura (modal) ----------
+function abrirNueva(container) {
+  if (!PROVEEDORES.length) { toast("Primero cargá un proveedor en el módulo Proveedores.", "error"); return; }
+  ladoEditado = "total";
+  const body = abrirModal("Nueva factura", { ancho: "lg" });
+  body.innerHTML = formNuevaFactura();
+  wireForm(body, container);
 }
 
 function formNuevaFactura() {
   const ivaOpts = ALICUOTAS_IVA.map((a) => `<option value="${a}" ${a === 21 ? "selected" : ""}>${a}%</option>`).join("");
   return `
-    <div class="card">
-      <h2 style="margin-top:0;">Nueva factura</h2>
+    <div>
       <form id="form-factura">
+        <div>${labelInfo("fac-prov", "Proveedor *", "A quién corresponde la factura.")}
+          <select id="fac-prov" required><option value="">— elegí un proveedor —</option>${PROVEEDORES.map((p) => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join("")}</select></div>
         <div class="fila">
           <div>${labelInfo("fac-tipo", "Comprobante", "Tipo de factura: A (discrimina IVA), B o C (monotributo, sin IVA discriminado).")}
             <select id="fac-tipo"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></div>
@@ -111,13 +190,13 @@ function formNuevaFactura() {
         <button type="button" id="fac-add-item" class="secundario" style="margin-top:8px;"${INSUMOS.length ? "" : " disabled"}>+ Agregar insumo</button>
         ${INSUMOS.length ? "" : `<p class="muted" style="font-size:12px;">Cargá insumos primero para poder actualizarlos desde acá.</p>`}
 
-        <div style="margin-top:16px;"><button type="submit">Guardar factura</button></div>
+        <div style="margin-top:16px;display:flex;gap:8px;"><button type="submit">Guardar factura</button><button type="button" id="fac-cancelar" class="secundario">Cancelar</button></div>
         <p id="fac-msg" class="msg" hidden></p>
       </form>
     </div>`;
 }
 
-function wireForm(container) {
+function wireForm(container, lista) {
   const neto = $(container, "#fac-neto");
   const total = $(container, "#fac-total");
   neto.addEventListener("input", () => { ladoEditado = "neto"; recomputar(container); });
@@ -127,7 +206,8 @@ function wireForm(container) {
   $(container, "#fac-otros").addEventListener("input", () => recomputar(container));
   const addBtn = $(container, "#fac-add-item");
   if (addBtn) addBtn.addEventListener("click", () => $(container, "#fac-items").appendChild(filaItem()));
-  $(container, "#form-factura").addEventListener("submit", (e) => guardar(e, container));
+  $(container, "#fac-cancelar").addEventListener("click", cerrarModal);
+  $(container, "#form-factura").addEventListener("submit", (e) => guardar(e, container, lista));
 }
 
 /** Fila para actualizar el costo de un insumo comprado. */
@@ -197,42 +277,12 @@ function recomputar(container) {
     `<strong>Total ${formatearCentavos(d.total)}</strong>`;
 }
 
-async function refrescarLista(container) {
-  const cont = $(container, "#fac-lista");
-  cont.innerHTML = "<p class='muted'>Cargando…</p>";
-  try {
-    const facturas = await facturasRepo.listarPorProveedor(provSel.id);
-    if (!facturas.length) { cont.innerHTML = "<p class='muted'>Sin facturas todavía.</p>"; return; }
-    const filas = facturas.map((f) => {
-      const puedeAnular = f.estado !== "anulada" && Number(f.saldo_pendiente_centavos) === Number(f.monto_total_centavos);
-      return `
-      <tr>
-        <td>${escapar(f.numero_factura || "—")}</td>
-        <td>${escapar(f.tipo_comprobante)}</td>
-        <td>${escapar(f.fecha_emision)}</td>
-        <td class="num">${formatearCentavos(f.monto_total_centavos)}</td>
-        <td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td>
-        <td>${estadoPill(f.estado)}</td>
-        <td style="text-align:right;">${puedeAnular ? `<button class="btn-baja fac-anular" data-id="${f.id}">Anular</button>` : ""}</td>
-      </tr>`;
-    }).join("");
-    cont.innerHTML = `<table>
-      <thead><tr><th>Número</th><th>Tipo</th><th>Emisión</th><th class="num">Total</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead>
-      <tbody>${filas}</tbody></table>`;
-    cont.querySelectorAll(".fac-anular").forEach((b) => b.addEventListener("click", () => anularFactura(container, b.dataset.id)));
-  } catch (err) {
-    cont.innerHTML = `<p class="error">Error: ${escapar(err.message || String(err))}</p>`;
-  }
-}
-
 async function anularFactura(container, facturaId) {
   if (!(await confirmar({ titulo: "Anular factura", mensaje: "Se revierte la deuda que generó. La factura queda anulada (no se borra ni se edita). Para corregirla, cargá de nuevo con los datos correctos.", textoOk: "Anular", peligro: true }))) return;
   try {
     await facturasRepo.anular(facturaId);
-    const actualizado = await proveedoresRepo.obtener(provSel.id);
-    if (actualizado) provSel.saldo_total_deuda_centavos = actualizado.saldo_total_deuda_centavos;
     toast("Factura anulada ✔");
-    await seleccionar(container, provSel.id);
+    await refrescarLista(container);
   } catch (err) {
     toast("Error: " + (err.message || err), "error");
   }
@@ -243,9 +293,11 @@ function estadoPill(estado) {
   return `<span style="color:${map[estado] || "var(--muted)"}">${escapar(estado)}</span>`;
 }
 
-async function guardar(e, container) {
+async function guardar(e, container, lista) {
   e.preventDefault();
   const msg = $(container, "#fac-msg");
+  const provId = $(container, "#fac-prov").value;
+  if (!provId) { setMsg(msg, "Elegí el proveedor.", "error"); return; }
   const d = desgloseActual(container);
   if (d.total <= 0) { setMsg(msg, "Cargá el importe de la factura.", "error"); return; }
 
@@ -258,7 +310,7 @@ async function guardar(e, container) {
   setMsg(msg, "Guardando…");
   try {
     const facturaId = await facturasRepo.crear({
-      proveedor_id: provSel.id,
+      proveedor_id: provId,
       tipo_comprobante: $(container, "#fac-tipo").value,
       numero_factura: $(container, "#fac-numero").value,
       fecha_emision: $(container, "#fac-emision").value || hoy(),
@@ -270,8 +322,6 @@ async function guardar(e, container) {
       monto_total_centavos: d.total,
       observaciones: $(container, "#fac-obs").value,
     });
-    provSel.saldo_total_deuda_centavos = (provSel.saldo_total_deuda_centavos || 0) + d.total;
-
     // Actualizar costos de insumos + recalcular recetas.
     let recetasActualizadas = 0;
     if (items.length) {
@@ -286,7 +336,8 @@ async function guardar(e, container) {
     toast(items.length
       ? `Factura guardada ✔ · ${items.length} insumo(s) actualizado(s) · ${recetasActualizadas} receta(s) recalculada(s)`
       : "Factura guardada ✔", "ok", 5000);
-    await seleccionar(container, provSel.id);
+    cerrarModal();
+    await refrescarLista(lista);
   } catch (err) {
     setMsg(msg, "No se pudo guardar: " + (err.message || err), "error");
   }

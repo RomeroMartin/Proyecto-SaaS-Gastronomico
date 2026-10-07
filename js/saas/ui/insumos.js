@@ -25,19 +25,29 @@ export async function montar(container, perfil) {
   try { PROVEEDORES = await proveedoresRepo.listar(); } catch (_e) { PROVEEDORES = []; }
   provMap = Object.fromEntries(PROVEEDORES.map((p) => [p.id, p]));
 
-  const magOpts = Object.entries(MAGNITUDES).map(([k, v]) => `<option value="${k}">${v.nombre}</option>`).join("");
-  const ivaOpts = ALICUOTAS_IVA.map((a) => `<option value="${a}">${a}%</option>`).join("");
-  const provOpts = `<option value="">— sin proveedor —</option>` + PROVEEDORES.map((p) => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join("");
-
   container.innerHTML = `
     <div class="card">
       <div class="topbar"><h2 style="margin:0;">Insumos</h2>
-        <button id="ins-refrescar" class="secundario">Refrescar</button></div>
+        <div style="display:flex;gap:8px;">
+          <button id="ins-refrescar" class="secundario">Refrescar</button>
+          <button id="ins-nuevo">+ Nuevo insumo</button>
+        </div></div>
       <div id="ins-lista" class="tabla-scroll"></div>
-    </div>
+    </div>`;
 
-    <div class="card">
-      <h2 style="margin-top:0;">Nuevo insumo</h2>
+  container.querySelector("#ins-refrescar").addEventListener("click", () => refrescar(container));
+  container.querySelector("#ins-nuevo").addEventListener("click", abrirNuevo);
+
+  await refrescar(container);
+}
+
+// ---------- nuevo insumo (modal) ----------
+function abrirNuevo() {
+  const magOpts = Object.entries(MAGNITUDES).map(([k, v]) => `<option value="${k}">${v.nombre}</option>`).join("");
+  const ivaOpts = ALICUOTAS_IVA.map((a) => `<option value="${a}">${a}%</option>`).join("");
+  const provOpts = `<option value="">— sin proveedor —</option>` + PROVEEDORES.map((p) => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join("");
+  const body = abrirModal("Nuevo insumo", { ancho: "lg" });
+  body.innerHTML = `
       <form id="form-insumo">
         <div class="fila">
           <div>${labelInfo("ins-nombre", "Nombre *", "Cómo llamás al insumo. Ej: Queso Mozzarella, Harina 0000.")}<input id="ins-nombre" required placeholder="Ej: Queso Mozzarella" /></div>
@@ -59,26 +69,24 @@ export async function montar(container, perfil) {
         </div>
 
         <p id="ins-preview" class="muted" style="margin-top:10px;"></p>
-        <div style="margin-top:12px;"><button type="submit">Guardar insumo</button></div>
+        <div style="margin-top:12px;display:flex;gap:8px;"><button type="submit">Guardar insumo</button><button type="button" id="ins-cancelar" class="secundario">Cancelar</button></div>
         <p id="ins-msg" class="msg" hidden></p>
       </form>
-      ${datalist("dl-rubro-ins", catalogos.opciones("rubro"))}
-    </div>`;
+      ${datalist("dl-rubro-ins", catalogos.opciones("rubro"))}`;
 
-  const magSel = container.querySelector("#ins-magnitud");
-  const uniSel = container.querySelector("#ins-pres-unidad");
+  const magSel = body.querySelector("#ins-magnitud");
+  const uniSel = body.querySelector("#ins-pres-unidad");
   const poblarUnidades = () => {
     uniSel.innerHTML = (UNIDADES_POR_MAGNITUD[magSel.value] || []).map((u) => `<option value="${u}">${u}</option>`).join("");
-    actualizarPreview(container);
+    actualizarPreview(body);
   };
   magSel.addEventListener("change", poblarUnidades);
   poblarUnidades();
   ["#ins-pres-cant", "#ins-pres-unidad", "#ins-pres-precio", "#ins-iva", "#ins-factor"]
-    .forEach((s) => container.querySelector(s).addEventListener("input", () => actualizarPreview(container)));
-  container.querySelector("#ins-refrescar").addEventListener("click", () => refrescar(container));
-  container.querySelector("#form-insumo").addEventListener("submit", (e) => alta(e, container));
-
-  await refrescar(container);
+    .forEach((sel) => body.querySelector(sel).addEventListener("input", () => actualizarPreview(body)));
+  body.querySelector("#form-insumo").addEventListener("submit", (e) => alta(e, body));
+  body.querySelector("#ins-cancelar").addEventListener("click", cerrarModal);
+  body.querySelector("#ins-nombre").focus();
 }
 
 function calcularCosto(container) {
@@ -106,7 +114,7 @@ async function refrescar(container) {
   cont.innerHTML = "<p class='muted'>Cargando…</p>";
   try {
     const lista = await insumosRepo.listar();
-    if (!lista.length) { cont.innerHTML = "<p class='muted'>Todavía no hay insumos. Cargá el primero 👇</p>"; return; }
+    if (!lista.length) { cont.innerHTML = "<p class='muted'>Todavía no hay insumos. Cargá el primero con “+ Nuevo insumo”.</p>"; return; }
     const filas = lista.map((i) => {
       const conIva = costoRealPorUnidadBase(i);
       return `<tr>
@@ -158,14 +166,9 @@ async function alta(e, container) {
       presentacion_cantidad_base: c.cantidadBase,
       presentacion_precio_neto_centavos: c.precioCentavos,
     });
-    container.querySelector("#form-insumo").reset();
-    container.querySelector("#ins-factor").value = "1";
-    container.querySelector("#ins-magnitud").dispatchEvent(new Event("change"));
-    const dl = container.querySelector("#dl-rubro-ins");
-    if (dl) dl.innerHTML = catalogos.opciones("rubro").map((o) => `<option value="${escapar(o)}"></option>`).join("");
-    setMsg(msg, "");
+    cerrarModal();
     toast("Insumo creado ✔");
-    await refrescar(container);
+    await refrescar(CONT);
   } catch (err) {
     setMsg(msg, "No se pudo crear: " + (err.message || err), "error");
   }
