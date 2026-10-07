@@ -36,7 +36,8 @@ create table if not exists empleados (
   apellido       varchar(255) not null,
   apodo          varchar(120),
   puesto         varchar(120),                 -- cocina, salón, barra, delivery...
-  fecha_ingreso  date not null,
+  fecha_ingreso  date not null,                -- cuándo empezó a trabajar (antigüedad y vacaciones)
+  fecha_alta     date,                         -- cuándo se lo dio de alta formalmente (null = sin alta)
   fecha_egreso   date,
   -- Baja lógica: 'inactivo' equivale al `activo=false` del resto del SaaS,
   -- pero acá guardamos también la fecha_egreso, por eso usamos estado.

@@ -57,7 +57,7 @@ function render() {
       <div class="rrhh-avatar grande">${escapar((EMP.nombre || "?")[0] || "")}</div>
       <div>
         <div class="rrhh-ficha-nombre">${escapar(nombreCompleto(EMP))}${EMP.apodo ? ` <span class="muted">(${escapar(EMP.apodo)})</span>` : ""}</div>
-        <div class="muted" style="font-size:13px;">${escapar(EMP.puesto || "Sin puesto")} · ${escapar(antiguedadTexto(EMP.fecha_ingreso))}${inactivo ? ' · <span style="color:var(--error);">Inactivo desde ' + escapar(formatearFecha(EMP.fecha_egreso)) + "</span>" : ""}</div>
+        <div class="muted" style="font-size:13px;">${escapar(EMP.puesto || "Sin puesto")} · ${escapar(antiguedadTexto(EMP.fecha_ingreso))} · ${EMP.fecha_alta ? "Alta: " + escapar(formatearFecha(EMP.fecha_alta)) : "Sin fecha de alta"}${inactivo ? ' · <span style="color:var(--error);">Inactivo desde ' + escapar(formatearFecha(EMP.fecha_egreso)) + "</span>" : ""}</div>
       </div>
     </div>
     <div class="rrhh-tabs" id="fc-tabs">
@@ -96,7 +96,10 @@ function tabDatos(body) {
           <div>${labelInfo("fd-puesto", "Puesto")}<input id="fd-puesto" value="${escapar(EMP.puesto || "")}" /></div>
         </div>
         <div class="fila">
-          <div>${labelInfo("fd-ingreso", "Fecha de ingreso *")}<input id="fd-ingreso" type="date" value="${escapar(EMP.fecha_ingreso || "")}" required /></div>
+          <div>${labelInfo("fd-ingreso", "Fecha de ingreso *", "Cuándo empezó a trabajar realmente. Base para antigüedad y vacaciones.")}<input id="fd-ingreso" type="date" value="${escapar(EMP.fecha_ingreso || "")}" required /></div>
+          <div>${labelInfo("fd-alta", "Fecha de alta", "Cuándo se lo dio de alta formalmente (registrado). Dejala vacía si todavía no está dado de alta.")}<input id="fd-alta" type="date" value="${escapar(EMP.fecha_alta || "")}" /></div>
+        </div>
+        <div class="fila">
           <div>${labelInfo("fd-tel", "Teléfono")}<input id="fd-tel" value="${escapar(EMP.telefono || "")}" /></div>
         </div>
         <div>${labelInfo("fd-foto", "URL de foto")}<input id="fd-foto" value="${escapar(EMP.foto_url || "")}" placeholder="https://…" /></div>
@@ -114,12 +117,13 @@ function tabDatos(body) {
   g("#fd").addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = g("#fd-msg");
+    if (g("#fd-alta").value && g("#fd-alta").value < g("#fd-ingreso").value) { setMsg(msg, "La fecha de alta no puede ser anterior a la de ingreso.", "error"); return; }
     setMsg(msg, "Guardando…");
     try {
       await empleadosRepo.actualizar(EMP.id, {
         nombre: g("#fd-nombre").value.trim(), apellido: g("#fd-apellido").value.trim(),
         apodo: g("#fd-apodo").value, puesto: g("#fd-puesto").value,
-        fecha_ingreso: g("#fd-ingreso").value, telefono: g("#fd-tel").value,
+        fecha_ingreso: g("#fd-ingreso").value, fecha_alta: g("#fd-alta").value, telefono: g("#fd-tel").value,
         foto_url: g("#fd-foto").value,
       });
       await recargarEmp();

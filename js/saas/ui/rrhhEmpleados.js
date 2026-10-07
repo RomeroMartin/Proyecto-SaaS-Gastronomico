@@ -130,7 +130,7 @@ function dibujar() {
       <td style="width:44px;">${avatar(e)}</td>
       <td>
         <div style="font-weight:600;">${escapar(nombreCompleto(e))}${e.apodo ? ` <span class="muted">(${escapar(e.apodo)})</span>` : ""}</div>
-        <div class="muted" style="font-size:12px;">${escapar(e.puesto || "Sin puesto")} · ${escapar(antiguedadTexto(e.fecha_ingreso))}</div>
+        <div class="muted" style="font-size:12px;">${escapar(e.puesto || "Sin puesto")} · ${escapar(antiguedadTexto(e.fecha_ingreso))}${e.fecha_alta ? "" : " · sin alta"}</div>
       </td>
       <td>${e.estado === "inactivo" ? '<span class="muted">Inactivo</span>' : badge(e)}</td>
       <td style="text-align:right;white-space:nowrap;"><button class="secundario emp-ver" data-id="${e.id}">Ver ficha</button></td>
@@ -162,7 +162,10 @@ function abrirForm(emp) {
         <div>${labelInfo("ef-puesto", "Puesto", "Cocina, salón, barra, delivery…")}<input id="ef-puesto" value="${escapar(emp?.puesto || "")}" /></div>
       </div>
       <div class="fila">
-        <div>${labelInfo("ef-ingreso", "Fecha de ingreso *", "Cuándo empezó a trabajar. Base para antigüedad y vacaciones.")}<input id="ef-ingreso" type="date" value="${escapar(emp?.fecha_ingreso || "")}" required /></div>
+        <div>${labelInfo("ef-ingreso", "Fecha de ingreso *", "Cuándo empezó a trabajar realmente. Base para antigüedad y vacaciones.")}<input id="ef-ingreso" type="date" value="${escapar(emp?.fecha_ingreso || "")}" required /></div>
+        <div>${labelInfo("ef-alta", "Fecha de alta", "Cuándo se lo dio de alta formalmente (registrado). Dejala vacía si todavía no está dado de alta.")}<input id="ef-alta" type="date" value="${escapar(emp?.fecha_alta || "")}" /></div>
+      </div>
+      <div class="fila">
         <div>${labelInfo("ef-tel", "Teléfono", "Opcional.")}<input id="ef-tel" value="${escapar(emp?.telefono || "")}" /></div>
       </div>
       <div>${labelInfo("ef-foto", "URL de foto", "Opcional. Link a una imagen (si no, se muestran las iniciales).")}<input id="ef-foto" value="${escapar(emp?.foto_url || "")}" placeholder="https://…" /></div>
@@ -184,11 +187,13 @@ function abrirForm(emp) {
       apodo: g("#ef-apodo").value,
       puesto: g("#ef-puesto").value,
       fecha_ingreso: g("#ef-ingreso").value,
+      fecha_alta: g("#ef-alta").value,
       telefono: g("#ef-tel").value,
       foto_url: g("#ef-foto").value,
     };
     if (!datos.nombre || !datos.apellido) { setMsg(msg, "Nombre y apellido son obligatorios.", "error"); return; }
     if (!datos.fecha_ingreso) { setMsg(msg, "Indicá la fecha de ingreso.", "error"); return; }
+    if (datos.fecha_alta && datos.fecha_alta < datos.fecha_ingreso) { setMsg(msg, "La fecha de alta no puede ser anterior a la de ingreso.", "error"); return; }
     setMsg(msg, "Guardando…");
     try {
       if (editar) await empleadosRepo.actualizar(emp.id, datos);
