@@ -201,6 +201,10 @@ create table if not exists insumos (
   presentacion_desc                     varchar(120),
   presentacion_cantidad_base            numeric(14,4),                 -- en unidad base
   presentacion_precio_neto_centavos     bigint,
+  presentacion_magnitud                 varchar(20),                   -- magnitud de COMPRA
+  presentacion_cantidad                 numeric(14,4),                 -- cantidad de compra (en presentacion_unidad)
+  presentacion_unidad                   varchar(10),
+  unidad_uso                            varchar(10),                   -- unidad de USO elegida (ml, oz, g...)
   proveedor_habitual_id                 uuid references proveedores(id) on delete set null,
   fecha_ultimo_precio                   timestamptz,
   activo                                boolean not null default true,

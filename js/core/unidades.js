@@ -32,6 +32,7 @@ export const FACTORES_A_BASE = {
   ml: 1,
   l: 1000,
   cc: 1,
+  oz: 29.5735, // onza líquida (US)
   // unidad → un
   un: 1,
   docena: 12,
@@ -41,7 +42,7 @@ export const FACTORES_A_BASE = {
 /** Unidades válidas para cada magnitud (para poblar selects de la UI). */
 export const UNIDADES_POR_MAGNITUD = {
   masa: ["g", "kg", "mg"],
-  volumen: ["ml", "l", "cc"],
+  volumen: ["ml", "l", "cc", "oz"],
   unidad: ["un", "docena", "ciento"],
 };
 
@@ -67,6 +68,28 @@ export function convertirAUnidadBase(cantidad, unidad) {
   const factor = FACTORES_A_BASE[String(unidad).toLowerCase()];
   if (factor === undefined) throw new Error(`Unidad desconocida: ${unidad}`);
   return (Number(cantidad) || 0) * factor;
+}
+
+/**
+ * Cuántas unidades base equivale 1 de `unidad` (ej: "oz" → 29.5735 ml).
+ * @param {string} unidad
+ * @returns {number}
+ */
+export function factorAUnidadBase(unidad) {
+  const factor = FACTORES_A_BASE[String(unidad).toLowerCase()];
+  if (factor === undefined) throw new Error(`Unidad desconocida: ${unidad}`);
+  return factor;
+}
+
+/**
+ * Convierte una cantidad en unidad base a otra unidad de la misma magnitud.
+ * Ej: convertirDesdeUnidadBase(59.147, "oz") → 2
+ * @param {number} cantidadBase
+ * @param {string} unidad
+ * @returns {number}
+ */
+export function convertirDesdeUnidadBase(cantidadBase, unidad) {
+  return (Number(cantidadBase) || 0) / factorAUnidadBase(unidad);
 }
 
 /**

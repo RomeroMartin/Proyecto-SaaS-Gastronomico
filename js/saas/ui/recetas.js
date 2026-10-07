@@ -8,6 +8,7 @@
 import * as recetasRepo from "../data/recetasRepo.js";
 import * as insumosRepo from "../data/insumosRepo.js";
 import * as catalogos from "../data/catalogosRepo.js";
+import { UNIDADES_POR_MAGNITUD, factorAUnidadBase } from "../../core/unidades.js";
 import { costoReceta, validarGrafoReceta, rentabilidad, precioSugerido } from "../../core/costeo.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo, datalist, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
@@ -298,7 +299,7 @@ function opcionesRef(tipo) {
     return RECETAS.filter((r) => r.tipo === "preparacion" && r.id !== ed.id)
       .map((r) => ({ id: r.id, label: `${r.nombre} (${r.rendimiento_unidad})` }));
   }
-  return INSUMOS.map((i) => ({ id: i.id, label: `${i.nombre} (${i.unidad_base})` }));
+  return INSUMOS.map((i) => ({ id: i.id, label: `${i.nombre} (${i.unidad_uso || i.unidad_base})` }));
 }
 
 function filaIngrediente(ing) {
@@ -314,7 +315,7 @@ function filaIngrediente(ing) {
     </div>
     <div style="flex:2;"><select class="ing-ref"></select></div>
     <div style="flex:0 0 120px;"><input class="ing-cant" type="number" step="0.0001" placeholder="cantidad" value="${ing.cantidad != null ? ing.cantidad : ""}" /></div>
-    <div style="flex:0 0 70px;" class="muted ing-unidad"></div>
+    <div style="flex:0 0 80px;"><select class="ing-uni" hidden></select><span class="muted ing-unidad"></span></div>
     <div style="flex:0 0 100px;text-align:right;" class="num ing-costo muted"></div>
     <div style="flex:0 0 32px;"><button type="button" class="btn-baja ing-del">✕</button></div>`;
 
@@ -326,19 +327,49 @@ function filaIngrediente(ing) {
   };
   poblarRef(ing.ref_id);
 
-  tipoSel.addEventListener("change", () => { poblarRef(""); recalcular(); });
-  refSel.addEventListener("change", recalcular);
+  // Unidad del ingrediente: para insumos, cualquiera de su magnitud (ml, cc, oz…),
+  // con la unidad de uso del insumo por defecto. Para preparaciones, la de rendimiento.
+  const uniSel = row.querySelector(".ing-uni");
+  const uniTxt = row.querySelector(".ing-unidad");
+  const poblarUni = (elegida) => {
+    const ins = tipoSel.value === "insumo" ? insumoPorId[refSel.value] : null;
+    const sub = tipoSel.value === "receta" ? recetaPorId[refSel.value] : null;
+    uniSel.hidden = !ins;
+    uniTxt.textContent = sub ? sub.rendimiento_unidad : "";
+    if (!ins) { uniSel.innerHTML = ""; return; }
+    uniSel.innerHTML = (UNIDADES_POR_MAGNITUD[ins.magnitud] || [ins.unidad_base])
+      .map((u) => `<option value="${u}">${u}</option>`).join("");
+    uniSel.value = elegida || ins.unidad_uso || ins.unidad_base;
+  };
+  poblarUni();
+  // Receta guardada: la cantidad viene en unidad base → mostrarla en la unidad de uso.
+  const insIni = ing.tipo === "insumo" ? insumoPorId[ing.ref_id] : null;
+  if (insIni && ing.cantidad !== "" && ing.cantidad != null) {
+    row.querySelector(".ing-cant").value = String(Number((Number(ing.cantidad) / factorAUnidadBase(uniSel.value)).toFixed(4)));
+  }
+
+  tipoSel.addEventListener("change", () => { poblarRef(""); poblarUni(); recalcular(); });
+  refSel.addEventListener("change", () => { poblarUni(); recalcular(); });
+  uniSel.addEventListener("change", recalcular);
   row.querySelector(".ing-cant").addEventListener("input", recalcular);
   row.querySelector(".ing-del").addEventListener("click", () => { row.remove(); recalcular(); });
 
   return row;
 }
 
+/** Cantidad de la fila en unidad base (la que se guarda y se costea). */
+function cantidadBaseFila(row) {
+  const cant = Number(row.querySelector(".ing-cant").value) || 0;
+  const uni = row.querySelector(".ing-uni");
+  const factor = row.querySelector(".ing-tipo").value === "insumo" && uni.value ? factorAUnidadBase(uni.value) : 1;
+  return Number((cant * factor).toFixed(6));
+}
+
 function leerIngredientes(cont) {
   return [...cont.querySelectorAll(".ing-row")].map((row) => ({
     tipo: row.querySelector(".ing-tipo").value,
     ref_id: row.querySelector(".ing-ref").value,
-    cantidad: Number(row.querySelector(".ing-cant").value) || 0,
+    cantidad: cantidadBaseFila(row),
   })).filter((ing) => ing.ref_id && ing.cantidad > 0);
 }
 
@@ -350,17 +381,9 @@ function recalcular() {
   cont.querySelectorAll(".ing-row").forEach((row) => {
     const tipo = row.querySelector(".ing-tipo").value;
     const refId = row.querySelector(".ing-ref").value;
-    const cant = Number(row.querySelector(".ing-cant").value) || 0;
-    const uniEl = row.querySelector(".ing-unidad");
+    const cant = cantidadBaseFila(row);
     const costoEl = row.querySelector(".ing-costo");
-    if (!refId) { uniEl.textContent = ""; costoEl.textContent = ""; return; }
-    if (tipo === "insumo") {
-      const ins = insumoPorId[refId];
-      uniEl.textContent = ins ? ins.unidad_base : "";
-    } else {
-      const sub = recetaPorId[refId];
-      uniEl.textContent = sub ? sub.rendimiento_unidad : "";
-    }
+    if (!refId) { costoEl.textContent = ""; return; }
     const sub = { id: "__row__", nombre: "fila", rendimiento_cantidad: 1,
       ingredientes: [{ tipo, ref_id: refId, cantidad: cant }] };
     const c = costoDe(sub);
