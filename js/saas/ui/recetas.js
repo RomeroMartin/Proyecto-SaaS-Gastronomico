@@ -10,7 +10,7 @@ import * as insumosRepo from "../data/insumosRepo.js";
 import * as catalogos from "../data/catalogosRepo.js";
 import { costoReceta, validarGrafoReceta, rentabilidad, precioSugerido } from "../../core/costeo.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
-import { escapar, setMsg, labelInfo, datalist, toast, confirmar } from "./helpers.js";
+import { escapar, setMsg, labelInfo, datalist, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
 
 let PERFIL = null;
 let INSUMOS = [];
@@ -24,6 +24,8 @@ function nuevoEditor() {
   return { id: null, ingredientes: [] };
 }
 
+let TAB = "plato"; // "plato" | "preparacion"
+
 export async function montar(container, perfil) {
   PERFIL = perfil;
   container.innerHTML = `
@@ -32,11 +34,19 @@ export async function montar(container, perfil) {
         <h2>Recetas y costos</h2>
         <button id="rec-refrescar" class="secundario">Refrescar</button>
       </div>
+      <div class="tabs" id="rec-tabs" style="margin-top:10px;">
+        <button class="tab ${TAB === "plato" ? "activo" : ""}" data-tab="plato">Platos</button>
+        <button class="tab ${TAB === "preparacion" ? "activo" : ""}" data-tab="preparacion">Preparaciones</button>
+      </div>
       <div id="rec-listas"></div>
-    </div>
-    <div id="rec-editor"></div>`;
+    </div>`;
 
   container.querySelector("#rec-refrescar").addEventListener("click", () => cargar(container));
+  container.querySelectorAll("#rec-tabs .tab").forEach((b) => b.addEventListener("click", () => {
+    TAB = b.dataset.tab;
+    container.querySelectorAll("#rec-tabs .tab").forEach((x) => x.classList.toggle("activo", x === b));
+    renderListas(container);
+  }));
   await cargar(container);
 }
 
@@ -48,7 +58,6 @@ async function cargar(container) {
     insumoPorId = Object.fromEntries(INSUMOS.map((i) => [i.id, i]));
     recetaPorId = Object.fromEntries(RECETAS.map((r) => [r.id, r]));
     renderListas(container);
-    renderEditor(container);
   } catch (err) {
     listasEl.innerHTML = `<p class="error">Error: ${escapar(err.message || String(err))}</p>`;
   }
@@ -68,43 +77,97 @@ function costoDe(receta) {
 // ---------- listados ----------
 function renderListas(container) {
   const el = container.querySelector("#rec-listas");
-  const platos = RECETAS.filter((r) => r.tipo === "plato");
-  const preparaciones = RECETAS.filter((r) => r.tipo === "preparacion");
-  el.innerHTML = tablaPlatos(platos) + tablaPreparaciones(preparaciones);
+  const esPlato = TAB === "plato";
+  const delTipo = RECETAS.filter((r) => r.tipo === TAB);
+  const sectores = [...new Set(delTipo.map((r) => r.sector_venta).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
-  el.querySelectorAll(".btn-editar").forEach((b) =>
+  el.innerHTML = `
+    <div class="toolbar" style="margin-top:12px;">
+      <input id="rec-buscar" type="search" placeholder="Buscar por nombre…" style="flex:1;min-width:180px;" />
+      ${esPlato ? `<select id="rec-fsector"><option value="">Todos los sectores</option>${sectores.map((x) => `<option value="${escapar(x)}">${escapar(x)}</option>`).join("")}</select>` : ""}
+      <select id="rec-orden">
+        <option value="nombre">Nombre A-Z</option>
+        <option value="costo-desc">Mayor costo</option>
+        <option value="costo-asc">Menor costo</option>
+        ${esPlato ? `<option value="fc-desc">Mayor food cost</option><option value="fc-asc">Menor food cost</option>
+        <option value="margen-desc">Mayor margen</option><option value="precio-desc">Mayor precio de carta</option>` : ""}
+      </select>
+      <span class="cuenta" id="rec-cuenta"></span>
+      <button id="rec-nueva">${esPlato ? "+ Nuevo plato" : "+ Nueva preparación"}</button>
+    </div>
+    <div id="rec-tabla"></div>`;
+
+  ["#rec-buscar", "#rec-fsector", "#rec-orden"].forEach((sel) => {
+    const e = el.querySelector(sel);
+    if (e) e.addEventListener("input", () => dibujarTabla(container));
+  });
+  el.querySelector("#rec-nueva").addEventListener("click", () => nueva(container, TAB));
+  dibujarTabla(container);
+}
+
+function dibujarTabla(container) {
+  const el = container.querySelector("#rec-listas");
+  const esPlato = TAB === "plato";
+  const q = (el.querySelector("#rec-buscar").value || "").toLowerCase().trim();
+  const sector = esPlato ? el.querySelector("#rec-fsector").value : "";
+  const orden = el.querySelector("#rec-orden").value;
+
+  const todos = RECETAS.filter((r) => r.tipo === TAB);
+  const items = todos.map((r) => {
+    const costo = costoDe(r);
+    return { r, costo, rent: esPlato && costo != null ? rentabilidad(r, costo) : null };
+  }).filter(({ r }) => {
+    if (q && !(r.nombre || "").toLowerCase().includes(q)) return false;
+    if (sector && r.sector_venta !== sector) return false;
+    return true;
+  });
+
+  const num = (v) => (v == null ? -Infinity : v);
+  const claves = {
+    "costo": (x) => num(x.costo),
+    "fc": (x) => (x.rent && x.r.precio_venta_publico_centavos > 0 ? x.rent.foodCostPct : -Infinity),
+    "margen": (x) => (x.rent ? x.rent.margenBrutoCentavos : -Infinity),
+    "precio": (x) => Number(x.r.precio_venta_publico_centavos) || 0,
+  };
+  if (orden === "nombre") items.sort((a, b) => (a.r.nombre || "").localeCompare(b.r.nombre || ""));
+  else {
+    const [campo, sentido] = orden.split("-");
+    const dir = sentido === "asc" ? 1 : -1;
+    items.sort((a, b) => (claves[campo](a) - claves[campo](b)) * dir);
+  }
+
+  el.querySelector("#rec-cuenta").textContent = `${items.length} de ${todos.length}`;
+  const cont = el.querySelector("#rec-tabla");
+  const etiqueta = esPlato ? "platos" : "preparaciones";
+  if (!todos.length) { cont.innerHTML = `<p class='muted'>Todavía no hay ${etiqueta}. Cargá ${esPlato ? "el primero" : "la primera"} con el botón de arriba.</p>`; return; }
+  if (!items.length) { cont.innerHTML = `<p class='muted'>No hay ${etiqueta} que coincidan con los filtros.</p>`; return; }
+
+  cont.innerHTML = esPlato ? tablaPlatos(items) : tablaPreparaciones(items);
+  cont.querySelectorAll(".btn-editar").forEach((b) =>
     b.addEventListener("click", () => editar(container, b.dataset.id)));
-  el.querySelectorAll(".btn-baja").forEach((b) =>
+  cont.querySelectorAll(".btn-baja").forEach((b) =>
     b.addEventListener("click", () => baja(container, b.dataset.id)));
 }
 
-function tablaPlatos(platos) {
-  if (!platos.length) return "<h3 class='muted'>Platos</h3><p class='muted'>Todavía no hay platos.</p>";
-  const filas = platos.map((r) => {
-    const costo = costoDe(r);
-    const rent = costo != null ? rentabilidad(r, costo) : null;
-    return `<tr>
-      <td>${escapar(r.nombre)}</td>
+function tablaPlatos(items) {
+  const filas = items.map(({ r, costo, rent }) => `<tr>
+      <td>${escapar(r.nombre)}${r.sector_venta ? `<div class="muted" style="font-size:11px;">${escapar(r.sector_venta)}</div>` : ""}</td>
       <td class="num">${costo == null ? "—" : formatearCentavos(costo)}</td>
       <td class="num">${formatearCentavos(r.precio_venta_publico_centavos || 0)}</td>
       <td class="num">${rent ? escapar(formatearPorcentaje(rent.foodCostPct)) : "—"}</td>
       <td class="num">${rent ? formatearCentavos(rent.margenBrutoCentavos) : "—"}</td>
-      <td>
+      <td style="white-space:nowrap;text-align:right;">
         <button class="secundario btn-editar" data-id="${r.id}">Editar</button>
         <button class="btn-baja" data-id="${r.id}">Baja</button>
-      </td></tr>`;
-  }).join("");
-  return `<h3 class="muted" style="margin:6px 0;">Platos</h3>
-    <div class="tabla-scroll"><table>
+      </td></tr>`).join("");
+  return `<div class="tabla-scroll"><table>
       <thead><tr><th>Nombre</th><th class="num">Costo</th><th class="num">Precio carta</th>
         <th class="num">Food cost</th><th class="num">Margen</th><th></th></tr></thead>
       <tbody>${filas}</tbody></table></div>`;
 }
 
-function tablaPreparaciones(preps) {
-  if (!preps.length) return "<h3 class='muted' style='margin-top:18px;'>Preparaciones</h3><p class='muted'>Todavía no hay preparaciones.</p>";
-  const filas = preps.map((r) => {
-    const costo = costoDe(r);
+function tablaPreparaciones(items) {
+  const filas = items.map(({ r, costo }) => {
     const rend = Number(r.rendimiento_cantidad) || 1;
     const costoUnit = costo == null ? null : costo / rend;
     return `<tr>
@@ -112,19 +175,23 @@ function tablaPreparaciones(preps) {
       <td class="num">${r.rendimiento_cantidad} ${escapar(r.rendimiento_unidad)}</td>
       <td class="num">${costo == null ? "—" : formatearCentavos(costo)}</td>
       <td class="num">${costoUnit == null ? "—" : formatearCentavos(costoUnit)}</td>
-      <td>
+      <td style="white-space:nowrap;text-align:right;">
         <button class="secundario btn-editar" data-id="${r.id}">Editar</button>
         <button class="btn-baja" data-id="${r.id}">Baja</button>
       </td></tr>`;
   }).join("");
-  return `<h3 class="muted" style="margin:18px 0 6px;">Preparaciones (sub-recetas)</h3>
-    <div class="tabla-scroll"><table>
+  return `<div class="tabla-scroll"><table>
       <thead><tr><th>Nombre</th><th class="num">Rinde</th><th class="num">Costo total</th>
         <th class="num">Costo x unidad</th><th></th></tr></thead>
       <tbody>${filas}</tbody></table></div>`;
 }
 
 // ---------- editor ----------
+function nueva(container, tipo) {
+  ed = nuevoEditor();
+  abrirEditor(container, { tipo });
+}
+
 function editar(container, id) {
   const r = recetaPorId[id];
   if (!r) return;
@@ -132,8 +199,16 @@ function editar(container, id) {
     id: r.id,
     ingredientes: (r.ingredientes || []).map((ing) => ({ ...ing })),
   };
-  renderEditor(container, r);
-  container.querySelector("#rec-editor").scrollIntoView({ behavior: "smooth", block: "start" });
+  abrirEditor(container, r);
+}
+
+function abrirEditor(container, receta) {
+  const esNuevo = !ed.id;
+  const etiqueta = receta.tipo === "plato" ? "plato" : "preparación";
+  const titulo = esNuevo ? (receta.tipo === "plato" ? "Nuevo plato" : "Nueva preparación") : `Editar ${etiqueta}: ${receta.nombre || ""}`;
+  const body = abrirModal(titulo, { ancho: "lg" });
+  body.id = "rec-editor";
+  renderEditor(body, container, receta);
 }
 
 function recetaEditada() {
@@ -152,23 +227,17 @@ function recetaEditada() {
 
 function val(cont, sel) { const e = cont.querySelector(sel); return e ? e.value : ""; }
 
-function renderEditor(container, receta) {
-  const cont = container.querySelector("#rec-editor");
+function renderEditor(cont, container, receta) {
   const r = receta || {};
   const esNuevo = !ed.id;
   const tipo = r.tipo || "plato";
 
   cont.innerHTML = `
-    <div class="card">
-      <h2>${esNuevo ? "Nueva receta" : "Editar: " + escapar(r.nombre || "")}</h2>
+    <div>
+      <input type="hidden" id="rec-tipo" value="${tipo}" />
       <div class="fila">
-        <div style="flex:2;">${labelInfo("rec-nombre", "Nombre *", "Nombre del plato o de la preparación. Ej: Pizza Margherita, Salsa de tomate.")}
+        <div style="flex:1;">${labelInfo("rec-nombre", "Nombre *", "Nombre del plato o de la preparación. Ej: Pizza Margherita, Salsa de tomate.")}
           <input id="rec-nombre" value="${escapar(r.nombre || "")}" placeholder="Ej: Pizza Margherita" /></div>
-        <div>${labelInfo("rec-tipo", "Tipo", "Plato = se vende (tiene precio). Preparación = sub-receta que se usa dentro de otras recetas (ej: una salsa).")}
-          <select id="rec-tipo">
-            <option value="plato" ${tipo === "plato" ? "selected" : ""}>Plato (se vende)</option>
-            <option value="preparacion" ${tipo === "preparacion" ? "selected" : ""}>Preparación (sub-receta)</option>
-          </select></div>
       </div>
       <div class="fila">
         <div>${labelInfo("rec-rend-cant", "Rinde (cantidad)", "Cuánto produce la receta. Un plato normalmente rinde 1. Una salsa puede rendir 2000 (ml).")}
@@ -195,7 +264,7 @@ function renderEditor(container, receta) {
       <div id="rec-resultado" class="card" style="background:#fafafa;margin-top:16px;"></div>
 
       <div style="margin-top:16px;display:flex;gap:8px;">
-        <button id="rec-guardar" type="button">${esNuevo ? "Crear receta" : "Guardar cambios"}</button>
+        <button id="rec-guardar" type="button">${esNuevo ? (tipo === "plato" ? "Crear plato" : "Crear preparación") : "Guardar cambios"}</button>
         <button id="rec-cancelar" class="secundario" type="button">Cancelar</button>
       </div>
       <p id="rec-msg" class="msg" hidden></p>
@@ -210,9 +279,8 @@ function renderEditor(container, receta) {
     ings.appendChild(filaIngrediente({ tipo: "insumo", ref_id: "", cantidad: "" }));
     recalcular();
   });
-  cont.querySelector("#rec-tipo").addEventListener("change", () => { toggleSoloPlato(cont); recalcular(); });
   cont.querySelector("#rec-guardar").addEventListener("click", () => guardar(container));
-  cont.querySelector("#rec-cancelar").addEventListener("click", () => { ed = nuevoEditor(); renderEditor(container); });
+  cont.querySelector("#rec-cancelar").addEventListener("click", () => { ed = nuevoEditor(); cerrarModal(); });
   ["#rec-precio", "#rec-alicuota", "#rec-rend-cant"].forEach((s) =>
     cont.querySelector(s).addEventListener("input", recalcular));
 
@@ -222,7 +290,7 @@ function renderEditor(container, receta) {
 
 function toggleSoloPlato(cont) {
   const esPlato = cont.querySelector("#rec-tipo").value === "plato";
-  cont.querySelector("#rec-solo-plato").hidden = !esPlato;
+  cont.querySelector("#rec-solo-plato").style.display = esPlato ? "" : "none";
 }
 
 function opcionesRef(tipo) {
@@ -348,7 +416,7 @@ function recalcular() {
 
 // ---------- acciones ----------
 async function guardar(container) {
-  const cont = container.querySelector("#rec-editor");
+  const cont = document.querySelector("#rec-editor");
   const msg = cont.querySelector("#rec-msg");
   const receta = recetaEditada();
   if (!receta.nombre.trim()) { setMsg(msg, "El nombre es obligatorio.", "error"); return; }
@@ -382,7 +450,8 @@ async function guardar(container) {
       await recetasRepo.crear(PERFIL.empresa_id, datos, ingredientes, costo || 0);
     }
     ed = nuevoEditor();
-    setMsg(msg, "Guardado ✔", "ok");
+    cerrarModal();
+    toast(receta.tipo === "plato" ? "Plato guardado ✔" : "Preparación guardada ✔");
     await cargar(container);
   } catch (err) {
     setMsg(msg, "No se pudo guardar: " + (err.message || err), "error");
