@@ -19,6 +19,17 @@ export async function listarPorProveedor(proveedorId) {
   return data || [];
 }
 
+/** Todos los pagos de la empresa (más recientes primero). */
+export async function listarTodos() {
+  const { data, error } = await supabase
+    .from("pagos")
+    .select("*")
+    .order("fecha_pago", { ascending: false })
+    .order("creado_en", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
 /**
  * Registra un pago e imputa a facturas (FIFO o manual) vía RPC.
  * @returns {string} id del pago

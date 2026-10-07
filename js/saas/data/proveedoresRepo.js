@@ -47,7 +47,7 @@ export async function obtener(id) {
  */
 export async function crear(empresaId, datos) {
   if (!empresaId) throw new Error("Falta la empresa del usuario.");
-  if (!datos.nombre || !datos.nombre.trim()) throw new Error("El nombre es obligatorio.");
+  if (!datos.nombre || !datos.nombre.trim()) throw new Error("El nombre de fantasía es obligatorio.");
 
   const { data: userData } = await supabase.auth.getUser();
   const creadoPor = userData && userData.user ? userData.user.id : null;
@@ -60,6 +60,7 @@ export async function crear(empresaId, datos) {
     empresa_id: empresaId,
     codigo,
     nombre: datos.nombre.trim(),
+    razon_social: (datos.razon_social || "").trim() || null,
     cuit: (datos.cuit || "").trim() || null,
     condicion_fiscal: datos.condicion_fiscal || "responsable_inscripto",
     contacto: (datos.contacto || "").trim() || null,
@@ -81,7 +82,7 @@ export async function crear(empresaId, datos) {
 
 /** Edita datos de un proveedor (nunca el saldo). */
 export async function actualizar(id, datos) {
-  const permitidos = ["nombre", "cuit", "condicion_fiscal", "contacto", "telefono", "email", "rubro_principal", "rubros"];
+  const permitidos = ["nombre", "razon_social", "cuit", "condicion_fiscal", "contacto", "telefono", "email", "rubro_principal", "rubros"];
   const payload = {};
   for (const k of permitidos) if (k in datos) payload[k] = datos[k];
   const { error } = await supabase.from("proveedores").update(payload).eq("id", id);

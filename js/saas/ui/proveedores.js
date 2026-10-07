@@ -115,7 +115,7 @@ function dibujar() {
   const dir = CONTENEDOR.querySelector("#prov-orden").value === "asc" ? 1 : -1;
 
   let filtrados = PROVEEDORES.filter((p) => {
-    if (f && !((p.nombre || "").toLowerCase().includes(f) || (p.codigo || "").toLowerCase().includes(f) || (p.cuit || "").includes(f))) return false;
+    if (f && !((p.nombre || "").toLowerCase().includes(f) || (p.razon_social || "").toLowerCase().includes(f) || (p.codigo || "").toLowerCase().includes(f) || (p.cuit || "").includes(f))) return false;
     if (rub && rubroPrincipalDe(p) !== rub) return false;
     return true;
   });
@@ -159,7 +159,7 @@ function exportar() {
     const filas = PROVEEDORES.map((p) => ({
       Rubro: rubroPrincipalDe(p),
       "Rubros secundarios": rubrosSecundariosDe(p).join(" · "),
-      Codigo: p.codigo || "", Proveedor: p.nombre, CUIT: p.cuit || "",
+      Codigo: p.codigo || "", Proveedor: p.nombre, "Razon social": p.razon_social || "", CUIT: p.cuit || "",
       "Condicion fiscal": LABEL_COND[p.condicion_fiscal] || p.condicion_fiscal,
       Contacto: p.contacto || "", Telefono: p.telefono || "", Email: p.email || "",
       "Saldo deuda ($)": saldoDe(p) / 100,
@@ -170,14 +170,17 @@ function exportar() {
 }
 
 // ---------- alta / edición ----------
-function abrirForm(prov) {
+function abrirForm(prov, onDone) {
   const editar = !!prov;
   const cond = CONDICIONES_FISCALES.map((c) =>
     `<option value="${c}" ${prov && prov.condicion_fiscal === c ? "selected" : ""}>${LABEL_COND[c]}</option>`).join("");
   const body = abrirModal(editar ? "Editar proveedor" : "Nuevo proveedor");
   body.innerHTML = `
     <form id="pform">
-      <div>${labelInfo("pf-nombre", "Nombre *", "Razón social o nombre del proveedor.")}<input id="pf-nombre" value="${escapar(prov?.nombre || "")}" required /></div>
+      <div class="fila">
+        <div>${labelInfo("pf-nombre", "Nombre de fantasía *", "Cómo lo conocés y cómo se muestra en toda la app. Ej: La Serenísima.")}<input id="pf-nombre" value="${escapar(prov?.nombre || "")}" required /></div>
+        <div>${labelInfo("pf-razon", "Razón social", "Nombre legal que figura en las facturas (opcional). Ej: Mastellone Hnos. S.A.")}<input id="pf-razon" value="${escapar(prov?.razon_social || "")}" /></div>
+      </div>
       <div class="fila">
         <div>${labelInfo("pf-cuit", "CUIT", "Opcional. Ej: 30-12345678-9.")}<input id="pf-cuit" value="${escapar(prov?.cuit || "")}" /></div>
         <div>${labelInfo("pf-cond", "Condición fiscal", "Define si el IVA se puede tomar como crédito fiscal.")}<select id="pf-cond">${cond}</select></div>
@@ -236,11 +239,12 @@ function abrirForm(prov) {
     e.preventDefault();
     const msg = body.querySelector("#pf-msg");
     const nombre = body.querySelector("#pf-nombre").value.trim();
-    if (!nombre) { setMsg(msg, "El nombre es obligatorio.", "error"); return; }
+    if (!nombre) { setMsg(msg, "El nombre de fantasía es obligatorio.", "error"); return; }
     const rubros = [...rubrosSel];
     const rubro_principal = body.querySelector("#pf-principal").value || rubros[0] || "";
     const datos = {
       nombre,
+      razon_social: body.querySelector("#pf-razon").value,
       cuit: body.querySelector("#pf-cuit").value,
       condicion_fiscal: body.querySelector("#pf-cond").value,
       contacto: body.querySelector("#pf-contacto").value,
@@ -255,6 +259,7 @@ function abrirForm(prov) {
       else await proveedoresRepo.crear(PERFIL.empresa_id, datos);
       cerrarModal();
       await cargar();
+      if (onDone) await onDone();
     } catch (err) {
       setMsg(msg, "No se pudo guardar: " + (err.message || err), "error");
     }
@@ -303,10 +308,12 @@ async function pintarFicha(body, id) {
     <div class="topbar" style="margin-bottom:12px;">
       <div>
         <div style="font-size:17px;font-weight:700;">${escapar(prov.nombre)}</div>
+        ${prov.razon_social ? `<div class="muted" style="font-size:12.5px;">Razón social: ${escapar(prov.razon_social)}</div>` : ""}
         <div class="muted" style="font-size:12.5px;">${escapar(LABEL_COND[prov.condicion_fiscal] || prov.condicion_fiscal)}${prov.cuit ? " · " + escapar(prov.cuit) : ""}${rubroPrincipalDe(prov) !== SIN_RUBRO ? " · " + escapar(rubroPrincipalDe(prov)) : ""}${sec.length ? " (también: " + escapar(sec.join(" · ")) + ")" : ""}</div>
         <div style="font-size:20px;font-weight:700;margin-top:4px;color:${saldo > 0 ? "var(--error)" : "var(--ok)"};">Deuda: ${formatearCentavos(saldo)}</div>
       </div>
       <div style="display:flex;gap:8px;">
+        <button class="secundario" id="ficha-editar">Editar</button>
         <button class="secundario resaltado" id="ficha-factura">Cargar factura</button>
         <button id="ficha-pago">Registrar pago</button>
       </div>
@@ -356,6 +363,7 @@ async function pintarFicha(body, id) {
   }));
   pintarTab("facturas");
 
+  body.querySelector("#ficha-editar").addEventListener("click", () => abrirForm(prov, () => reabrirFicha(id)));
   body.querySelector("#ficha-factura").addEventListener("click", () => modalFactura(prov, () => reabrirFicha(id)));
   body.querySelector("#ficha-pago").addEventListener("click", () =>
     modalPago(prov, facturas.filter((f) => (Number(f.saldo_pendiente_centavos) || 0) > 0 && f.estado !== "anulada"), () => reabrirFicha(id)));
