@@ -36,7 +36,7 @@ export async function obtener(id) {
   return data;
 }
 
-const CAMPOS = ["nombre", "apellido", "apodo", "puesto", "fecha_ingreso", "telefono", "foto_url"];
+const CAMPOS = ["nombre", "apellido", "apodo", "puesto", "fecha_ingreso", "fecha_alta", "telefono", "foto_url"];
 
 /** Crea un empleado. empresaId viene del perfil del usuario (sesión). */
 export async function crear(empresaId, datos) {

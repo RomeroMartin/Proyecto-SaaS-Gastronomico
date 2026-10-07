@@ -51,7 +51,7 @@ No hace falta tocar `js/config/supabase.js`: usa el mismo cliente.
 - **Empleados** — lista con búsqueda, filtro por puesto y por estado
   (activos/inactivos/todos), badge de semáforo por documentación y alta/edición.
 - **Ficha** — pestañas:
-  - *Datos* (ambos roles): nombre, puesto, ingreso, teléfono, foto, baja lógica.
+  - *Datos* (ambos roles): nombre, puesto, **fecha de ingreso** (cuándo empezó a trabajar; base de antigüedad y vacaciones), **fecha de alta** (cuándo se lo registró formalmente; opcional), teléfono, foto, baja lógica.
   - *Legajo* (solo dueño): DNI, CUIL, domicilio, CBU, obra social, etc.
   - *Sueldo* (solo dueño): sueldo vigente + historial. Un aumento es un
     **registro nuevo**; los históricos no se editan. Montos en centavos.
