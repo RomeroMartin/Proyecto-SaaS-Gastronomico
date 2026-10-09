@@ -13,6 +13,7 @@ import { ALICUOTAS_IVA, desglosarFactura } from "../../core/fiscal.js";
 import { UNIDADES_POR_MAGNITUD, convertirAUnidadBase, factorAUnidadBase, costoNetoPorUnidadBase } from "../../core/unidades.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo, iconoInfo, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
+import { verFactura, editarFactura, validarFechas, FECHA_MIN, FECHA_MAX } from "./facturaModal.js";
 
 let PERFIL = null;
 let PROVEEDORES = [];
@@ -129,13 +130,20 @@ function dibujarLista(container) {
       <td class="num">${formatearCentavos(f.monto_total_centavos)}</td>
       <td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td>
       <td>${estadoPill(f.estado)}</td>
-      <td style="text-align:right;">${puedeAnular ? `<button class="btn-baja fac-anular" data-id="${f.id}">Anular</button>` : ""}</td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="secundario fac-ver" data-id="${f.id}">Ver</button>
+        ${f.estado !== "anulada" ? `<button class="secundario fac-editar" data-id="${f.id}">Editar</button>` : ""}
+        ${puedeAnular ? `<button class="btn-baja fac-anular" data-id="${f.id}">Anular</button>` : ""}</td>
     </tr>`;
   }).join("");
   cont.innerHTML = `<table>
     <thead><tr><th>Emisión</th><th>Proveedor</th><th>Comprobante</th><th class="num">Total</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead>
     <tbody>${filas}</tbody>
     <tfoot><tr><td colspan="3">Totales (sin anuladas)</td><td class="num">${formatearCentavos(totM)}</td><td class="num">${formatearCentavos(totS)}</td><td colspan="2"></td></tr></tfoot></table>`;
+  const porId = Object.fromEntries(FACTURAS.map((x) => [x.id, x]));
+  const recargar = () => refrescarLista(container);
+  cont.querySelectorAll(".fac-ver").forEach((b) => b.addEventListener("click", () => verFactura(b.dataset.id, { onCambio: recargar })));
+  cont.querySelectorAll(".fac-editar").forEach((b) => b.addEventListener("click", () => editarFactura(porId[b.dataset.id], { onCambio: recargar })));
   cont.querySelectorAll(".fac-anular").forEach((b) => b.addEventListener("click", () => anularFactura(container, b.dataset.id)));
 }
 
@@ -163,9 +171,9 @@ function formNuevaFactura() {
         </div>
         <div class="fila">
           <div>${labelInfo("fac-emision", "Fecha emisión", "Fecha en que se emitió la factura.")}
-            <input id="fac-emision" type="date" value="${hoy()}" /></div>
+            <input id="fac-emision" type="date" min="${FECHA_MIN}" max="${FECHA_MAX}" value="${hoy()}" /></div>
           <div>${labelInfo("fac-venc", "Vencimiento", "Fecha límite de pago (opcional). Se usa para alertas de vencimientos.")}
-            <input id="fac-venc" type="date" /></div>
+            <input id="fac-venc" type="date" min="${FECHA_MIN}" max="${FECHA_MAX}" /></div>
         </div>
 
         <h3 class="muted" style="margin:16px 0 4px;">Importes</h3>
@@ -306,6 +314,8 @@ async function guardar(e, container, lista) {
   const msg = $(container, "#fac-msg");
   const provId = $(container, "#fac-prov").value;
   if (!provId) { setMsg(msg, "Elegí el proveedor.", "error"); return; }
+  const errFechas = validarFechas($(container, "#fac-emision").value, $(container, "#fac-venc").value);
+  if (errFechas) { setMsg(msg, errFechas, "error"); return; }
   const d = desgloseActual(container);
   if (d.total <= 0) { setMsg(msg, "Cargá el importe de la factura.", "error"); return; }
 

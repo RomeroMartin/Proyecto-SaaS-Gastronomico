@@ -135,6 +135,14 @@ create table if not exists facturas (
     check (neto_gravado_centavos + iva_discriminado_centavos
            + percepciones_centavos + otros_impuestos_centavos = monto_total_centavos)
 );
+-- Fechas razonables (evita errores de tipeo como el año 0026). NOT VALID: no
+-- revisa filas ya existentes, pero se exige en cada alta/edición.
+alter table facturas drop constraint if exists chk_fechas_factura;
+alter table facturas add constraint chk_fechas_factura
+  check (
+    fecha_emision between date '2000-01-01' and date '2100-12-31'
+    and (fecha_vencimiento is null or fecha_vencimiento between date '2000-01-01' and date '2100-12-31')
+  ) not valid;
 create index if not exists ix_facturas_empresa on facturas(empresa_id);
 create index if not exists ix_facturas_proveedor on facturas(proveedor_id);
 create index if not exists ix_facturas_pendientes

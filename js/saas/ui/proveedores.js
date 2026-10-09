@@ -12,6 +12,7 @@ import { CONDICIONES_FISCALES, ALICUOTAS_IVA, desglosarFactura } from "../../cor
 import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
 import { exportarExcel } from "../../export/excel.js";
 import { escapar, setMsg, labelInfo, datalist, kpiHTML, abrirModal, cerrarModal, toast, confirmar } from "./helpers.js";
+import { verFactura, validarFechas, FECHA_MIN, FECHA_MAX } from "./facturaModal.js";
 
 const LABEL_COND = { responsable_inscripto: "Resp. Inscripto", monotributo: "Monotributo", exento: "Exento" };
 const LABEL_METODO = { efectivo: "Efectivo", transferencia: "Transferencia", cheque: "Cheque", echeq: "e-Cheq", otro: "Otro" };
@@ -293,7 +294,7 @@ async function pintarFicha(body, id) {
       <td>${escapar(f.tipo_comprobante)} ${escapar(f.numero_factura || "")}</td>
       <td class="num">${formatearCentavos(f.monto_total_centavos)}</td>
       <td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td>
-      <td style="text-align:right;">${puedeAnular ? `<button class="btn-baja ficha-anular-factura" data-id="${f.id}">Anular</button>` : ""}</td>
+      <td style="text-align:right;white-space:nowrap;"><button class="secundario ficha-ver-factura" data-id="${f.id}">Ver</button>${puedeAnular ? ` <button class="btn-baja ficha-anular-factura" data-id="${f.id}">Anular</button>` : ""}</td>
     </tr>`;
   }).join("") : `<tr><td colspan="5" class="muted">Sin facturas.</td></tr>`;
 
@@ -354,6 +355,8 @@ async function pintarFicha(body, id) {
     const cont = body.querySelector("#ficha-tab-content");
     cont.innerHTML = tab === "pagos" ? panelPagos : tab === "resumen" ? panelResumen : panelFacturas;
     cont.querySelectorAll(".ficha-anular").forEach((b) => b.addEventListener("click", () => anularPago(b.dataset.id, id)));
+    cont.querySelectorAll(".ficha-ver-factura").forEach((b) => b.addEventListener("click", () =>
+      verFactura(b.dataset.id, { onCambio: () => reabrirFicha(id), volver: () => reabrirFicha(id) })));
     cont.querySelectorAll(".ficha-anular-factura").forEach((b) => b.addEventListener("click", () => anularFactura(b.dataset.id, id)));
   }
   body.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
@@ -399,8 +402,8 @@ function modalFactura(prov, onDone) {
         <div>${labelInfo("ff-num", "Número", "Como figura en el papel.")}<input id="ff-num" placeholder="A-0002-000841" /></div>
       </div>
       <div class="fila">
-        <div>${labelInfo("ff-emi", "Emisión", "Fecha de emisión.")}<input id="ff-emi" type="date" value="${hoy()}" /></div>
-        <div>${labelInfo("ff-venc", "Vencimiento", "Opcional (para alertas).")}<input id="ff-venc" type="date" /></div>
+        <div>${labelInfo("ff-emi", "Emisión", "Fecha de emisión.")}<input id="ff-emi" type="date" min="${FECHA_MIN}" max="${FECHA_MAX}" value="${hoy()}" /></div>
+        <div>${labelInfo("ff-venc", "Vencimiento", "Opcional (para alertas).")}<input id="ff-venc" type="date" min="${FECHA_MIN}" max="${FECHA_MAX}" /></div>
       </div>
       <div class="fila">
         <div>${labelInfo("ff-ali", "Alícuota", "IVA de la factura.")}<select id="ff-ali">${ivaOpts}</select></div>
@@ -438,6 +441,8 @@ function modalFactura(prov, onDone) {
   g("#ff").addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = g("#ff-msg");
+    const errFechas = validarFechas(g("#ff-emi").value, g("#ff-venc").value);
+    if (errFechas) { setMsg(msg, errFechas, "error"); return; }
     const d = desglose();
     if (d.total <= 0) { setMsg(msg, "Cargá el importe.", "error"); return; }
     setMsg(msg, "Guardando…");
