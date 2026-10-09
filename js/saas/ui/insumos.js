@@ -16,6 +16,7 @@ import { escapar, setMsg, labelInfo, datalist, toast, confirmar, abrirModal, cer
 let PERFIL = null;
 let CONT = null;
 let PROVEEDORES = [];
+let INSUMOS = [];
 let provMap = {};
 const fmtFecha = (iso) => (iso ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(iso)) : "—");
 
@@ -37,11 +38,27 @@ export async function montar(container, perfil) {
           <button id="ins-refrescar" class="secundario">Refrescar</button>
           <button id="ins-nuevo">+ Nuevo insumo</button>
         </div></div>
+      <div class="toolbar" style="margin-top:12px;">
+        <input id="ins-buscar" type="search" placeholder="Buscar por nombre o código…" style="flex:1;min-width:180px;" />
+        <select id="ins-frubro"><option value="">Todos los rubros</option></select>
+        <select id="ins-fprov">
+          <option value="">Todos los proveedores</option>
+          <option value="__ninguno__">Sin proveedor</option>
+          ${PROVEEDORES.map((p) => `<option value="${p.id}">${escapar(p.nombre)}</option>`).join("")}
+        </select>
+        <select id="ins-orden">
+          <option value="az">Nombre A-Z</option>
+          <option value="za">Nombre Z-A</option>
+        </select>
+        <span class="cuenta" id="ins-cuenta"></span>
+      </div>
       <div id="ins-lista" class="tabla-scroll"></div>
     </div>`;
 
   container.querySelector("#ins-refrescar").addEventListener("click", () => refrescar(container));
   container.querySelector("#ins-nuevo").addEventListener("click", abrirNuevo);
+  ["#ins-buscar", "#ins-frubro", "#ins-fprov", "#ins-orden"].forEach((sel) =>
+    container.querySelector(sel).addEventListener("input", () => dibujarLista(container)));
 
   await refrescar(container);
 }
@@ -192,33 +209,61 @@ async function refrescar(container) {
   const cont = container.querySelector("#ins-lista");
   cont.innerHTML = "<p class='muted'>Cargando…</p>";
   try {
-    const lista = await insumosRepo.listar();
-    if (!lista.length) { cont.innerHTML = "<p class='muted'>Todavía no hay insumos. Cargá el primero con “+ Nuevo insumo”.</p>"; return; }
-    const filas = lista.map((i) => {
-      const conIva = costoRealPorUnidadBase(i);
-      return `<tr>
-        <td>${escapar(i.nombre)}<div class="muted" style="font-size:11px;">${escapar(i.codigo || "")}${i.rubro ? " · " + escapar(i.rubro) : ""}</div></td>
-        <td class="num">${i.presentacion_precio_neto_centavos ? formatearCentavos(i.presentacion_precio_neto_centavos) : "—"}${i.presentacion_desc ? `<div class="muted" style="font-size:11px;">${escapar(i.presentacion_desc)}</div>` : ""}</td>
-        <td>${escapar(unidadUsoDe(i))}</td>
-        <td class="num">${escapar(formatearPorcentaje(Number(i.alicuota_iva) || 0, 1))}</td>
-        <td class="num">${formatearCentavos(porUnidadUso(conIva, i))}</td>
-        <td class="muted">${fmtFecha(i.fecha_ultimo_precio)}</td>
-        <td style="white-space:nowrap;text-align:right;">
-          <button class="secundario ins-ficha" data-id="${i.id}">Ficha</button>
-          <button class="btn-baja ins-baja" data-id="${i.id}">Baja</button>
-        </td>
-      </tr>`;
-    }).join("");
-    cont.innerHTML = `<table>
-      <thead><tr><th>Insumo</th><th class="num">Precio presentación (neto)</th><th>U. uso</th><th class="num">IVA</th><th class="num">Costo c/IVA / u. uso</th><th>Últ. precio</th><th></th></tr></thead>
-      <tbody>${filas}</tbody></table>
-      <p class="muted" style="margin-top:6px;">Los costos se muestran por unidad de uso (la que leen las recetas).</p>`;
-    const byId = Object.fromEntries(lista.map((i) => [i.id, i]));
-    cont.querySelectorAll(".ins-ficha").forEach((b) => b.addEventListener("click", () => modalFicha(byId[b.dataset.id])));
-    cont.querySelectorAll(".ins-baja").forEach((b) => b.addEventListener("click", () => baja(b.dataset.id, container)));
+    INSUMOS = await insumosRepo.listar();
   } catch (err) {
     cont.innerHTML = `<p class="error">Error al listar: ${escapar(err.message || String(err))}</p>`;
+    return;
   }
+  // Rubros disponibles (conserva el filtro elegido si sigue existiendo).
+  const selRubro = container.querySelector("#ins-frubro");
+  const previo = selRubro.value;
+  const rubros = [...new Set(INSUMOS.map((i) => i.rubro).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  selRubro.innerHTML = `<option value="">Todos los rubros</option><option value="__ninguno__">Sin rubro</option>` +
+    rubros.map((r) => `<option value="${escapar(r)}">${escapar(r)}</option>`).join("");
+  selRubro.value = [...selRubro.options].some((o) => o.value === previo) ? previo : "";
+  dibujarLista(container);
+}
+
+function dibujarLista(container) {
+  const cont = container.querySelector("#ins-lista");
+  const q = (container.querySelector("#ins-buscar").value || "").toLowerCase().trim();
+  const rubro = container.querySelector("#ins-frubro").value;
+  const prov = container.querySelector("#ins-fprov").value;
+  const dir = container.querySelector("#ins-orden").value === "za" ? -1 : 1;
+
+  const lista = INSUMOS.filter((i) => {
+    if (q && !((i.nombre || "").toLowerCase().includes(q) || (i.codigo || "").toLowerCase().includes(q))) return false;
+    if (rubro === "__ninguno__" ? i.rubro : rubro && i.rubro !== rubro) return false;
+    if (prov === "__ninguno__" ? i.proveedor_habitual_id : prov && i.proveedor_habitual_id !== prov) return false;
+    return true;
+  }).sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es") * dir);
+
+  container.querySelector("#ins-cuenta").textContent = `${lista.length} de ${INSUMOS.length}`;
+  if (!INSUMOS.length) { cont.innerHTML = "<p class='muted'>Todavía no hay insumos. Cargá el primero con “+ Nuevo insumo”.</p>"; return; }
+  if (!lista.length) { cont.innerHTML = "<p class='muted'>No hay insumos que coincidan con los filtros.</p>"; return; }
+
+  const filas = lista.map((i) => {
+    const conIva = costoRealPorUnidadBase(i);
+    return `<tr>
+      <td>${escapar(i.nombre)}<div class="muted" style="font-size:11px;">${escapar(i.codigo || "")}${i.rubro ? " · " + escapar(i.rubro) : ""}${provMap[i.proveedor_habitual_id] ? " · " + escapar(provMap[i.proveedor_habitual_id].nombre) : ""}</div></td>
+      <td class="num">${i.presentacion_precio_neto_centavos ? formatearCentavos(i.presentacion_precio_neto_centavos) : "—"}${i.presentacion_desc ? `<div class="muted" style="font-size:11px;">${escapar(i.presentacion_desc)}</div>` : ""}</td>
+      <td>${escapar(unidadUsoDe(i))}</td>
+      <td class="num">${escapar(formatearPorcentaje(Number(i.alicuota_iva) || 0, 1))}</td>
+      <td class="num">${formatearCentavos(porUnidadUso(conIva, i))}</td>
+      <td class="muted">${fmtFecha(i.fecha_ultimo_precio)}</td>
+      <td style="white-space:nowrap;text-align:right;">
+        <button class="secundario ins-ficha" data-id="${i.id}">Ficha</button>
+        <button class="btn-baja ins-baja" data-id="${i.id}">Baja</button>
+      </td>
+    </tr>`;
+  }).join("");
+  cont.innerHTML = `<table>
+    <thead><tr><th>Insumo</th><th class="num">Precio presentación (neto)</th><th>U. uso</th><th class="num">IVA</th><th class="num">Costo c/IVA / u. uso</th><th>Últ. precio</th><th></th></tr></thead>
+    <tbody>${filas}</tbody></table>
+    <p class="muted" style="margin-top:6px;">Los costos se muestran por unidad de uso (la que leen las recetas).</p>`;
+  const byId = Object.fromEntries(lista.map((i) => [i.id, i]));
+  cont.querySelectorAll(".ins-ficha").forEach((b) => b.addEventListener("click", () => modalFicha(byId[b.dataset.id])));
+  cont.querySelectorAll(".ins-baja").forEach((b) => b.addEventListener("click", () => baja(b.dataset.id, container)));
 }
 
 async function alta(e, container) {
