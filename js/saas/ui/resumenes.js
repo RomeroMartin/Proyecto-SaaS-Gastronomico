@@ -15,6 +15,7 @@ import * as recetasRepo from "../data/recetasRepo.js";
 import { costoReceta, rentabilidad } from "../../core/costeo.js";
 import { formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
 import { escapar, kpiHTML } from "./helpers.js";
+import { verFactura } from "./facturaModal.js";
 
 const UMBRAL_FC = 35, DIAS_VIEJO = 30, DIAS_VENCER = 7, SIN_SECTOR = "Sin sector";
 const val = (r) => (r.status === "fulfilled" ? r.value : []);
@@ -67,9 +68,11 @@ export async function admin(container) {
       <div class="card"><h3 style="margin:0 0 8px;">Top deuda por proveedor</h3>
         ${tabla([{ t: "Proveedor" }, { t: "Saldo", num: true }], topDeuda.map((p) => `<tr><td>${escapar(p.nombre)}</td><td class="num" style="color:var(--error);font-weight:600;">${formatearCentavos(p.saldo_total_deuda_centavos)}</td></tr>`), "Sin deuda. 🎉")}</div>
       <div class="card"><h3 style="margin:0 0 8px;">Próximas a vencer</h3>
-        ${tabla([{ t: "Proveedor" }, { t: "Vence" }, { t: "Saldo", num: true }], porVencer.slice(0, 8).map(({ f, d }) => `<tr><td>${escapar((provMap[f.proveedor_id] || {}).nombre || "—")}</td><td>${d < 0 ? `<span style="color:var(--error)">hace ${-d}d</span>` : d === 0 ? `<span style="color:var(--error)">hoy</span>` : "en " + d + "d"}</td><td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td></tr>`), "Nada por vencer. 🎉")}</div>
+        ${tabla([{ t: "Proveedor" }, { t: "Vence" }, { t: "Saldo", num: true }], porVencer.slice(0, 8).map(({ f, d }) => `<tr class="res-fac" data-id="${f.id}" style="cursor:pointer;" title="Ver factura"><td>${escapar((provMap[f.proveedor_id] || {}).nombre || "—")}</td><td>${d < 0 ? `<span style="color:var(--error)">hace ${-d}d</span>` : d === 0 ? `<span style="color:var(--error)">hoy</span>` : "en " + d + "d"}</td><td class="num">${formatearCentavos(f.saldo_pendiente_centavos)}</td></tr>`), "Nada por vencer. 🎉")}</div>
     </div>`;
   container.querySelector("#r-ref").addEventListener("click", () => admin(container));
+  container.querySelectorAll(".res-fac").forEach((tr) =>
+    tr.addEventListener("click", () => verFactura(tr.dataset.id, { onCambio: () => admin(container) })));
 }
 
 // ================= COSTOS =================

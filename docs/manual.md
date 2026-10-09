@@ -95,12 +95,19 @@ próximas facturas a vencer.
    el costo** de esos insumos (queda en su historial) y se **recalculan las
    recetas** automáticamente.
 5. **Guardar factura:** sube la **deuda** del proveedor.
-6. **Anular:** las facturas no se editan, se anulan (Regla 3.4). Si cargaste
-   una factura con datos incorrectos (ej. te olvidaste del impuesto interno),
-   anulala desde el botón **Anular** —revierte la deuda que había generado—
-   y cargá una nueva con los datos correctos. Solo se puede anular una
-   factura que **todavía no tiene pagos imputados**; si ya tiene, primero hay
-   que anular esos pagos.
+6. **Ver:** el botón **Ver** abre el detalle completo de la factura (proveedor,
+   fechas, desglose de importes, observaciones y los pagos imputados). También
+   se abre desde la ficha del proveedor y desde "Próximas a vencer" del Resumen.
+7. **Editar:** corrige una factura ya cargada.
+   - **Sin pagos imputados:** se puede cambiar todo (proveedor, comprobante,
+     número, fechas, importes, observaciones); la deuda del proveedor se ajusta
+     sola.
+   - **Con pagos imputados:** solo comprobante, número, fechas y observaciones.
+     Para cambiar importes o proveedor, primero anulá esos pagos.
+   - Las fechas deben tener un año entre 2000 y 2100 (evita errores de tipeo
+     como el año 0026, que aparecía como "vencida hace 730477 días").
+8. **Anular:** revierte la deuda que había generado la factura; queda anulada
+   (no se borra). Solo si **todavía no tiene pagos imputados**.
 
 ### 3.4 Pagos
 1. Elegí el **proveedor** → ves su **deuda** y las **facturas pendientes**.
