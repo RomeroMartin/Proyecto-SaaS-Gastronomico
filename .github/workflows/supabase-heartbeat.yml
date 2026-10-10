@@ -1,7 +1,8 @@
 name: Supabase heartbeat
 
-# Hace una consulta liviana a la base de datos para que Supabase (plan free)
-# no pause el proyecto por 7 dias de inactividad.
+# Escribe una fecha en la base (funcion public.heartbeat(), ver
+# supabase/heartbeat.sql) para que Supabase (plan free) no pause el proyecto
+# por 7 dias de inactividad.
 
 on:
   schedule:
@@ -22,12 +23,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Consultar la base de datos
+      - name: Escribir en la base de datos
         run: |
-          status=$(curl -s -o response.json -w '%{http_code}' \
-            "$SUPABASE_URL/rest/v1/empresas?select=id&limit=1" \
+          status=$(curl -s -o response.json -w '%{http_code}' -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/heartbeat" \
             -H "apikey: $SUPABASE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_KEY")
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}')
           echo "HTTP $status"
           cat response.json
           if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
