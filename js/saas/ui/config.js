@@ -2,6 +2,7 @@
 // saas/ui/config.js — Configuración: Empresa, Usuarios y Catálogos
 // ============================================================
 
+import { MODULOS_VALIDOS, moduloActivo } from "../../core/modulos.js";
 import * as empresasRepo from "../data/empresasRepo.js";
 import * as usuariosRepo from "../data/usuariosRepo.js";
 import * as catalogos from "../data/catalogosRepo.js";
@@ -29,6 +30,11 @@ const $ = (c, s) => c.querySelector(s);
 const esAdmin = (perfil) => perfil && perfil.rol === "ADMIN";
 
 // ---------- Empresa ----------
+const NOMBRES_MODULOS = {
+  admin: "Administrativo", costos: "Costos", carta: "Rentabilidad de carta",
+  rrhh: "Recursos Humanos", ventas: "Ventas", reparto: "Reparto",
+};
+
 export async function empresa(container, perfil) {
   container.innerHTML = "<p class='muted'>Cargando…</p>";
   let emp;
@@ -60,6 +66,16 @@ export async function empresa(container, perfil) {
         ${admin ? `<div style="margin-top:16px;"><button type="submit">Guardar</button></div>` : `<p class="muted" style="margin-top:12px;">Solo un ADMIN puede editar estos datos.</p>`}
         <p id="emp-msg" class="msg" hidden></p>
       </form>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <h3 style="margin:0 0 6px;">Módulos de tu plan</h3>
+      <p class="muted" style="font-size:12.5px;margin:0 0 10px;">Para cambiar tu plan o activar un módulo, contactá a tu proveedor del sistema.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${MODULOS_VALIDOS.map((m) => {
+          const on = moduloActivo(emp.modulos, m);
+          return `<span class="badge" style="padding:4px 10px;border-radius:999px;font-size:12.5px;border:1px solid var(--border,#ddd);${on ? "" : "opacity:.5;"}">${on ? "✔" : "—"} ${escapar(NOMBRES_MODULOS[m])}</span>`;
+        }).join("")}
+      </div>
     </div>`;
 
   if (admin) $(container, "#emp-form").addEventListener("submit", async (e) => {
