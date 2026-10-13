@@ -17,8 +17,21 @@ const PERFIL_PAPEL = {
   80: { anchoMm: 80, imprimibleMm: 72, columnas: 42 },
 };
 const INTERLINEADO = 1.25;
+const ALTO_MIN_SOBRE_ANCHO_MM = 12;  // la página SIEMPRE es más alta que ancha: si no, Chrome la manda horizontal y el driver la gira 90°
 const MARGEN_VERTICAL_MM = 3;   // arriba y abajo
 const COLA_MM = 12;             // papel extra al final para que el corte no se lleve texto
+
+// Cada driver de térmica trata el papel distinto, así que el modo se elige POR EQUIPO (la impresora es de la PC):
+//   ajustado → la página tiene el ancho del rollo y el alto del ticket (recomendado)
+//   driver   → no se declara tamaño: se usa el papel que tenga configurado el driver (el ticket ocupa el ancho imprimible)
+export const MODOS_PAPEL = { ajustado: "Ajustado al ticket (recomendado)", driver: "Usar el papel del driver" };
+const LS_MODO = "saas_impresion_modo_papel";
+export function getModoPapel() {
+  try { const v = localStorage.getItem(LS_MODO); return MODOS_PAPEL[v] ? v : "ajustado"; } catch (_e) { return "ajustado"; }
+}
+export function setModoPapel(modo) {
+  try { localStorage.setItem(LS_MODO, MODOS_PAPEL[modo] ? modo : "ajustado"); } catch (_e) { /* sin almacenamiento */ }
+}
 
 /** Columnas (caracteres por línea) que entran en el rollo. */
 export function columnasPapel(anchoMm) {
@@ -36,7 +49,7 @@ export function medidasTicket(texto, anchoMm = 80) {
   const altoLineasMm = (lineas * fuentePx * INTERLINEADO) / MM_A_PX;
   return {
     anchoMm: p.anchoMm,
-    altoMm: Math.ceil(altoLineasMm + 2 * MARGEN_VERTICAL_MM + COLA_MM),
+    altoMm: Math.max(Math.ceil(altoLineasMm + 2 * MARGEN_VERTICAL_MM + COLA_MM), p.anchoMm + ALTO_MIN_SOBRE_ANCHO_MM),
     padLateralMm: (p.anchoMm - p.imprimibleMm) / 2,
     fuentePx: Math.round(fuentePx * 100) / 100,
     columnas: p.columnas,
@@ -45,12 +58,13 @@ export function medidasTicket(texto, anchoMm = 80) {
 }
 
 /** HTML completo del ticket (página de tamaño exacto). */
-export function htmlTicket(texto, anchoMm = 80) {
+export function htmlTicket(texto, anchoMm = 80, modo = "ajustado") {
   const m = medidasTicket(texto, anchoMm);
+  const pagina = modo === "driver" ? "@page { margin: 0; }" : `@page { size: ${m.anchoMm}mm ${m.altoMm}mm; margin: 0; }`;
   const esc = String(texto).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return `<!doctype html><html><head><meta charset="utf-8"><title>Comanda</title>
 <style>
-@page { size: ${m.anchoMm}mm ${m.altoMm}mm; margin: 0; }
+${pagina}
 html, body { margin: 0; padding: 0; background: #fff; width: ${m.anchoMm}mm; }
 pre { margin: 0; box-sizing: border-box; width: ${m.anchoMm}mm; padding: ${MARGEN_VERTICAL_MM}mm ${m.padLateralMm}mm 0;
   font: ${m.fuentePx}px/${INTERLINEADO} "Courier New", Courier, "Liberation Mono", monospace; white-space: pre; overflow: hidden; color: #000; }
@@ -60,9 +74,10 @@ pre { margin: 0; box-sizing: border-box; width: ${m.anchoMm}mm; padding: ${MARGE
 /**
  * @param {string} texto   ticket en texto plano (monoespaciado)
  * @param {number} anchoMm 58 u 80
+ * @param {string} modo    ajustado | driver (por defecto, el elegido en este equipo)
  * @returns {Promise<{ok:boolean, error?:string}>}
  */
-export function imprimirTicket(texto, anchoMm = 80) {
+export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel()) {
   return new Promise((resolve) => {
     let marco;
     try {
@@ -72,7 +87,7 @@ export function imprimirTicket(texto, anchoMm = 80) {
       document.body.appendChild(marco);
       const doc = marco.contentWindow.document;
       doc.open();
-      doc.write(htmlTicket(texto, anchoMm));
+      doc.write(htmlTicket(texto, anchoMm, modo));
       doc.close();
       const limpiar = () => setTimeout(() => { try { marco.remove(); } catch (_e) { /* ya no está */ } }, 1500);
       setTimeout(() => {
