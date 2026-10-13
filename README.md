@@ -11,6 +11,9 @@ insumos y costos técnicos, recetas y rentabilidad, agenda de pagos y tablero.
 ---
 
 > 📖 **Manual de uso** (cómo operar cada pantalla): [`docs/manual.md`](docs/manual.md).
+>
+> 🗺️ **Hoja de ruta** (base segura, Ventas, Rentabilidad real y Reparto de ingresos):
+> [`docs/plan-ventas-reparto.md`](docs/plan-ventas-reparto.md).
 
 ## Módulos
 
