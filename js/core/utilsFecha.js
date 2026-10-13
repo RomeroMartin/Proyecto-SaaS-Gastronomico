@@ -15,12 +15,48 @@ function partes(iso) {
   return { a: +m[1], m: +m[2], d: +m[3] };
 }
 
-/** Fecha de hoy en formato ISO "YYYY-MM-DD" (hora local). */
-export function hoyISO() {
-  const n = new Date();
-  const mm = String(n.getMonth() + 1).padStart(2, "0");
-  const dd = String(n.getDate()).padStart(2, "0");
-  return `${n.getFullYear()}-${mm}-${dd}`;
+// ---------- Zona horaria de la empresa ----------
+// La fecha de negocio ("hoy") se calcula SIEMPRE en la zona de la empresa, no en
+// la del dispositivo ni en UTC (entre las 21:00 y las 24:00 de Argentina, UTC ya
+// es "mañana"). La app fija la zona al iniciar sesión con setZonaHoraria().
+// Espejo de fecha_en_zona()/hoy_empresa() de supabase/f0_zona_horaria.sql: los
+// tests de ambos lados usan los mismos casos.
+export const ZONA_POR_DEFECTO = "America/Argentina/Buenos_Aires";
+let ZONA = ZONA_POR_DEFECTO;
+
+/** Fija la zona horaria de la empresa (IANA). Una zona inválida se ignora. */
+export function setZonaHoraria(zona) {
+  if (!zona) return;
+  try { new Intl.DateTimeFormat("en-CA", { timeZone: zona }); ZONA = zona; } catch (_e) { /* zona inválida */ }
+}
+
+export function getZonaHoraria() { return ZONA; }
+
+/** Fecha ISO "YYYY-MM-DD" de un instante en una zona horaria. */
+export function fechaEnZona(instante = new Date(), zona = ZONA) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: zona || ZONA_POR_DEFECTO, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(instante);
+}
+
+/** Fecha de hoy en formato ISO "YYYY-MM-DD", en la zona horaria de la empresa. */
+export function hoyISO(zona = ZONA, ahora = new Date()) {
+  return fechaEnZona(ahora, zona);
+}
+
+/** Suma (o resta) días a una fecha ISO. Aritmética de calendario, sin husos. */
+export function addDias(iso, n) {
+  const p = partes(iso);
+  if (!p) return "";
+  const d = new Date(Date.UTC(p.a, p.m - 1, p.d + Math.trunc(Number(n) || 0)));
+  return `${String(d.getUTCFullYear()).padStart(4, "0")}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** Días de diferencia (hastaISO − desdeISO). Positivo si "hasta" es posterior. */
+export function diasEntre(desdeISO, hastaISO) {
+  const d = partes(desdeISO), h = partes(hastaISO);
+  if (!d || !h) return null;
+  return Math.round((Date.UTC(h.a, h.m - 1, h.d) - Date.UTC(d.a, d.m - 1, d.d)) / 86400000);
 }
 
 /**

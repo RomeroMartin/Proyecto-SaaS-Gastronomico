@@ -12,17 +12,6 @@ import { CONDICIONES_FISCALES } from "../../core/fiscal.js";
 
 export { CONDICIONES_FISCALES };
 
-/** Genera el próximo código legible tipo "PROV-001". */
-function siguienteCodigo(prefijo, existentes) {
-  let max = 0;
-  const re = new RegExp(`^${prefijo}-(\\d+)$`);
-  for (const it of existentes || []) {
-    const m = re.exec(it.codigo || "");
-    if (m) max = Math.max(max, parseInt(m[1], 10));
-  }
-  return `${prefijo}-${String(max + 1).padStart(3, "0")}`;
-}
-
 /** Lista los proveedores activos de la empresa (ordenados por nombre). */
 export async function listar() {
   const { data, error } = await supabase
@@ -52,9 +41,8 @@ export async function crear(empresaId, datos) {
   const { data: userData } = await supabase.auth.getUser();
   const creadoPor = userData && userData.user ? userData.user.id : null;
 
-  // Código automático a partir de los existentes.
-  const { data: existentes } = await supabase.from("proveedores").select("codigo");
-  const codigo = (datos.codigo || "").trim() || siguienteCodigo("PROV", existentes || []);
+  // El código PROV-nnn lo asigna la base (trigger con bloqueo: sin duplicados).
+  const codigo = (datos.codigo || "").trim() || null;
 
   const payload = {
     empresa_id: empresaId,

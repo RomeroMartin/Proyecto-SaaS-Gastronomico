@@ -5,22 +5,22 @@
 import * as cajaRepo from "../data/movimientosCajaRepo.js";
 import * as catalogos from "../data/catalogosRepo.js";
 import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
+import { hoyISO, addDias } from "../../core/utilsFecha.js";
 import { escapar, setMsg, labelInfo, datalist, kpiHTML, toast, confirmar } from "./helpers.js";
 
 const MEDIOS = [["efectivo", "Efectivo"], ["tarjeta", "Tarjeta"], ["qr", "QR"], ["transferencia", "Transferencia"], ["cheque", "Cheque"], ["otro", "Otro"]];
 const labelMedio = (m) => (MEDIOS.find((x) => x[0] === m) || [m, m])[1];
 
 let PERFIL = null;
-let dia = hoyStr();
+let dia = null; // día visible (se inicializa con hoy en la zona de la empresa)
 
 const $ = (c, s) => c.querySelector(s);
-function hoyStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
-function addDias(f, n) { const d = new Date(f + "T00:00:00"); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 function fmtDia(f) { return new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long" }).format(new Date(f + "T00:00:00")); }
 const sum = (arr) => arr.reduce((a, m) => a + (Number(m.monto_centavos) || 0), 0);
 
 export async function montar(container, perfil) {
   PERFIL = perfil;
+  if (!dia) dia = hoyISO();
   await cargar(container);
 }
 
@@ -106,7 +106,7 @@ function render(container, movimientos) {
 
   $(container, "#caja-prev").addEventListener("click", () => { dia = addDias(dia, -1); cargar(container); });
   $(container, "#caja-next").addEventListener("click", () => { dia = addDias(dia, 1); cargar(container); });
-  $(container, "#caja-fecha").addEventListener("change", (e) => { dia = e.target.value || hoyStr(); cargar(container); });
+  $(container, "#caja-fecha").addEventListener("change", (e) => { dia = e.target.value || hoyISO(); cargar(container); });
 
   const tipoSel = $(container, "#caja-tipo");
   const dl = $(container, "#dl-cat-caja");

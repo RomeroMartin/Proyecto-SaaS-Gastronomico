@@ -7,6 +7,13 @@ import {
   antiguedadTexto,
   sumarMeses,
   formatearFecha,
+  fechaEnZona,
+  hoyISO,
+  addDias,
+  diasEntre,
+  setZonaHoraria,
+  getZonaHoraria,
+  ZONA_POR_DEFECTO,
 } from "../js/core/utilsFecha.js";
 
 test("diasCorridos: ambos extremos incluidos", () => {
@@ -44,4 +51,50 @@ test("formatearFecha: ISO → DD/MM/YYYY", () => {
   assert.equal(formatearFecha("2024-03-09"), "09/03/2024");
   assert.equal(formatearFecha(""), "—");
   assert.equal(formatearFecha("basura"), "—");
+});
+
+// ---------- Zona horaria (mismos casos que supabase/tests/13_fechas_zona.sql) ----------
+const BA = "America/Argentina/Buenos_Aires";
+const en = (iso, zona) => fechaEnZona(new Date(iso), zona);
+
+test("fechaEnZona: 01:30 UTC es el día anterior en Buenos Aires y el siguiente en UTC", () => {
+  assert.equal(en("2026-10-14T01:30:00Z", BA), "2026-10-13");
+  assert.equal(en("2026-10-14T01:30:00Z", "UTC"), "2026-10-14");
+});
+
+test("fechaEnZona: el límite de medianoche local", () => {
+  assert.equal(en("2026-10-14T03:00:00Z", BA), "2026-10-14");
+  assert.equal(en("2026-10-14T02:59:59Z", BA), "2026-10-13");
+});
+
+test("fechaEnZona: cambio de año", () => {
+  assert.equal(en("2026-12-31T23:30:00Z", BA), "2026-12-31");
+  assert.equal(en("2027-01-01T02:30:00Z", BA), "2026-12-31");
+});
+
+test("hoyISO usa la zona configurada y setZonaHoraria ignora zonas inválidas", () => {
+  const ahora = new Date("2026-10-14T01:30:00Z");
+  assert.equal(getZonaHoraria(), ZONA_POR_DEFECTO);
+  assert.equal(hoyISO(undefined, ahora), "2026-10-13");
+  setZonaHoraria("Marte/Olimpo");
+  assert.equal(getZonaHoraria(), ZONA_POR_DEFECTO);
+  setZonaHoraria("UTC");
+  assert.equal(hoyISO(undefined, ahora), "2026-10-14");
+  setZonaHoraria(ZONA_POR_DEFECTO);
+});
+
+test("addDias: cruza meses, años y bisiestos", () => {
+  assert.equal(addDias("2026-10-31", 1), "2026-11-01");
+  assert.equal(addDias("2026-12-31", 1), "2027-01-01");
+  assert.equal(addDias("2024-02-28", 1), "2024-02-29");
+  assert.equal(addDias("2026-03-01", -1), "2026-02-28");
+  assert.equal(addDias("2026-10-13", 0), "2026-10-13");
+  assert.equal(addDias("", 1), "");
+});
+
+test("diasEntre: signo y datos faltantes", () => {
+  assert.equal(diasEntre("2026-10-13", "2026-10-13"), 0);
+  assert.equal(diasEntre("2026-10-13", "2026-10-20"), 7);
+  assert.equal(diasEntre("2026-10-20", "2026-10-13"), -7);
+  assert.equal(diasEntre("2026-10-13", ""), null);
 });

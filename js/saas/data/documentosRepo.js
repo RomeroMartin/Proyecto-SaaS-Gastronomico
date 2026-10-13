@@ -115,9 +115,11 @@ export async function urlFirmada(archivoPath) {
   return data ? data.signedUrl : null;
 }
 
-/** Elimina un documento y su archivo asociado (si tiene). */
-export async function eliminar(id, archivoPath) {
-  const { error } = await supabase.from("documentos").delete().eq("id", id);
+/**
+ * Baja lógica de un documento (nada se borra: queda `activo = false`). El archivo
+ * del Storage se conserva por si hace falta recuperarlo.
+ */
+export async function eliminar(id, _archivoPath) {
+  const { error } = await supabase.from("documentos").update({ activo: false }).eq("id", id);
   if (error) throw error;
-  if (archivoPath) await supabase.storage.from(BUCKET).remove([archivoPath]).catch(() => {});
 }

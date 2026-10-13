@@ -78,6 +78,13 @@ En resumen:
    (con tu email y el nombre de tu empresa) para quedar como ADMIN.
 5. Pegar **Project URL** y **publishable key** en `js/config/supabase.js`.
 
+> **Fase 0 (base segura)** — después de todo lo anterior, ejecutar UNA vez
+> `supabase/f0_aplicar_todo.sql` (roles y permisos por rol, auditoría, usuarios,
+> zona horaria, integridad de pagos, costeo en la base y RPC atómicas). Es
+> idempotente. **Orden de salida: primero el SQL, después el merge a `main`**
+> (cada merge publica el sitio en GitHub Pages). Los tests corren solos en CI
+> (`.github/workflows/tests.yml`) o con `npm test` y `bash supabase/tests/run.sh`.
+
 > **¿Ya tenías el proyecto corriendo antes de esta versión?** Además de lo de
 > arriba, corré una vez `supabase/migracion_impuesto_interno.sql` (agrega el
 > campo de impuesto interno / otros impuestos no recuperables a Facturas) y

@@ -33,7 +33,10 @@ export async function montar(container, perfil) {
     <div class="card">
       <div class="topbar">
         <h2>Recetas y costos</h2>
-        <button id="rec-refrescar" class="secundario">Refrescar</button>
+        <div style="display:flex;gap:8px;">
+          <button id="rec-recalcular" class="secundario" title="Recalcula en la base el costo guardado de todas las recetas">Recalcular costos</button>
+          <button id="rec-refrescar" class="secundario">Refrescar</button>
+        </div>
       </div>
       <div class="tabs" id="rec-tabs" style="margin-top:10px;">
         <button class="tab ${TAB === "plato" ? "activo" : ""}" data-tab="plato">Platos</button>
@@ -43,6 +46,13 @@ export async function montar(container, perfil) {
     </div>`;
 
   container.querySelector("#rec-refrescar").addEventListener("click", () => cargar(container));
+  container.querySelector("#rec-recalcular").addEventListener("click", async () => {
+    try {
+      const n = await recetasRepo.recalcularTodas();
+      toast(n ? `${n} receta(s) actualizada(s) ✔` : "Los costos ya estaban al día ✔");
+      await cargar(container);
+    } catch (err) { toast("No se pudo recalcular: " + (err.message || err), "error"); }
+  });
   container.querySelectorAll("#rec-tabs .tab").forEach((b) => b.addEventListener("click", () => {
     TAB = b.dataset.tab;
     container.querySelectorAll("#rec-tabs .tab").forEach((x) => x.classList.toggle("activo", x === b));

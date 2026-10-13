@@ -9,6 +9,7 @@ import * as pagosRepo from "../data/pagosRepo.js";
 import * as facturasRepo from "../data/facturasRepo.js";
 import * as proveedoresRepo from "../data/proveedoresRepo.js";
 import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
+import { hoyISO } from "../../core/utilsFecha.js";
 import { escapar, setMsg, labelInfo, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
 
 let PROVEEDORES = [];
@@ -16,7 +17,7 @@ let provSel = null;
 let PAGOS = [];
 let provMap = {};
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyISO();
 const $ = (c, s) => c.querySelector(s);
 
 const METODOS = [

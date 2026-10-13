@@ -1,5 +1,5 @@
 {
-  "name": "app-proveedores-costos-gg",
+  "name": "saas-gastronomico",
   "private": true,
   "type": "module",
   "description": "SaaS gastronómico multi-empresa: compras, costos y rentabilidad. Frontend vanilla + Supabase (PostgreSQL/RLS).",

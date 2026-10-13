@@ -9,6 +9,7 @@
 import * as agendaRepo from "../data/pagosProgramadosRepo.js";
 import * as proveedoresRepo from "../data/proveedoresRepo.js";
 import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
+import { hoyISO, addDias } from "../../core/utilsFecha.js";
 import { escapar, setMsg, labelInfo, kpiHTML, toast, confirmar } from "./helpers.js";
 
 const LABEL_METODO = { efectivo: "Efectivo", transferencia: "Transferencia", cheque: "Cheque", echeq: "e-Cheq", otro: "Otro" };
@@ -21,13 +22,10 @@ let rangoDias = 7;
 
 const $ = (c, s) => c.querySelector(s);
 
-function hoyStr() { const d = new Date(); return fmt(d); }
-function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
-function addDias(fechaStr, n) { const d = new Date(fechaStr + "T00:00:00"); d.setDate(d.getDate() + n); return fmt(d); }
 function fondoDe(metodo) { return metodo === "efectivo" || metodo === "otro" ? "efectivo" : "cuenta"; }
 function nombreProv(id) { return (provMap[id] && provMap[id].nombre) || "—"; }
 function etiquetaFecha(str) {
-  const hoy = hoyStr();
+  const hoy = hoyISO();
   if (str === hoy) return "Hoy";
   if (str === addDias(hoy, 1)) return "Mañana";
   const d = new Date(str + "T00:00:00");
@@ -52,7 +50,7 @@ async function cargar(container) {
 }
 
 function render(container) {
-  const hoy = hoyStr();
+  const hoy = hoyISO();
   const limite = addDias(hoy, rangoDias);
   const pend = PROGRAMADOS.filter((p) => p.estado === "pendiente");
 

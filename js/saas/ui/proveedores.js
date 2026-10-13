@@ -11,6 +11,7 @@ import * as catalogos from "../data/catalogosRepo.js";
 import { CONDICIONES_FISCALES, ALICUOTAS_IVA, desglosarFactura } from "../../core/fiscal.js";
 import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
 import { exportarExcel } from "../../export/excel.js";
+import { hoyISO, diasEntre } from "../../core/utilsFecha.js";
 import { escapar, setMsg, labelInfo, datalist, kpiHTML, abrirModal, cerrarModal, toast, confirmar } from "./helpers.js";
 import { verFactura, validarFechas, FECHA_MIN, FECHA_MAX } from "./facturaModal.js";
 
@@ -18,7 +19,7 @@ const LABEL_COND = { responsable_inscripto: "Resp. Inscripto", monotributo: "Mon
 const LABEL_METODO = { efectivo: "Efectivo", transferencia: "Transferencia", cheque: "Cheque", echeq: "e-Cheq", otro: "Otro" };
 const SIN_RUBRO = "Sin rubro";
 const DIAS_POR_VENCER = 7;
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyISO();
 
 let PERFIL = null;
 let PROVEEDORES = [];
@@ -36,8 +37,7 @@ function rubrosSecundariosDe(p) {
   return (Array.isArray(p.rubros) ? p.rubros : []).filter((r) => r && r !== pr);
 }
 function diasHasta(fechaStr) {
-  if (!fechaStr) return null;
-  return Math.ceil((new Date(fechaStr + "T12:00:00").getTime() - Date.now()) / 86400000);
+  return fechaStr ? diasEntre(hoyISO(), String(fechaStr).slice(0, 10)) : null;
 }
 
 export async function montar(container, perfil) {

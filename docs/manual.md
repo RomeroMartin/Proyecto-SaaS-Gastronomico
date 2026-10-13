@@ -206,10 +206,24 @@ Editás el **nombre**, CUIT y la **preferencia de costeo** (con IVA). Solo un
 
 ### 6.2 Usuarios y roles
 Lista de usuarios de la empresa. Un **ADMIN** puede cambiar el **rol** y
-**activar/desactivar** a cada uno.
-- **Roles:** `ADMIN`, `GERENTE`, `COCINA`, `AUDITOR`.
-- Para **crear** un usuario nuevo se agrega desde el panel de Supabase
-  (Authentication → Users); después entra con su email.
+**activar/desactivar** a cada uno. Un usuario desactivado no puede entrar ni ver datos.
+
+| Rol | Qué puede hacer |
+|---|---|
+| `ADMIN` | Todo, incluida la configuración, usuarios y auditoría. |
+| `GERENTE` | Operar todos los módulos (facturas, pagos, costos, RRHH); no administra usuarios ni empresa. |
+| `COCINA` | Costos y recetas (insumos, platos); no ve pagos ni facturas. |
+| `AUDITOR` | Solo lectura. |
+| `CAJERO` | Caja y cobros (se usará desde las fases de Ventas). |
+
+**Agregar un usuario:** 1) crealo en Supabase (Authentication → Users);
+2) en *Configuración → Usuarios* tocá **+ Agregar usuario**, poné su email y rol.
+Queda vinculado a tu empresa. Un ADMIN no puede quedarse sin otro ADMIN activo.
+
+### 6.2b Zona horaria, condición fiscal y auditoría
+En *Empresa* se define la **zona horaria** (las fechas "de hoy" se calculan en esa
+zona, no en UTC) y la **condición fiscal** (monotributo, responsable inscripto…).
+La pantalla **Auditoría** (solo ADMIN) muestra quién cambió roles, usuarios y datos sensibles.
 
 ### 6.3 Catálogos
 Administrás las opciones de los desplegables: **rubros, sectores, unidades de

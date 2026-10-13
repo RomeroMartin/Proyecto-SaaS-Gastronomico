@@ -4,6 +4,8 @@
 // SheetJS se carga por CDN en app.html (window.XLSX).
 // ============================================================
 
+import { hoyISO } from "../core/utilsFecha.js";
+
 /**
  * Exporta filas (array de objetos planos) a un .xlsx y dispara la descarga.
  * @param {object[]} filas
@@ -20,6 +22,6 @@ export function exportarExcel(filas, nombreArchivo, nombreHoja = "Datos") {
   const ws = window.XLSX.utils.json_to_sheet(filas);
   const wb = window.XLSX.utils.book_new();
   window.XLSX.utils.book_append_sheet(wb, ws, nombreHoja.slice(0, 31));
-  const fecha = new Date().toISOString().slice(0, 10);
+  const fecha = hoyISO();
   window.XLSX.writeFile(wb, `${nombreArchivo}-${fecha}.xlsx`);
 }

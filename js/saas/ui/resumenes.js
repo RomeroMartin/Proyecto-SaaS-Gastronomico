@@ -14,15 +14,14 @@ import * as insumosRepo from "../data/insumosRepo.js";
 import * as recetasRepo from "../data/recetasRepo.js";
 import { costoReceta, rentabilidad } from "../../core/costeo.js";
 import { formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
+import { hoyISO, addDias, diasEntre } from "../../core/utilsFecha.js";
 import { escapar, kpiHTML } from "./helpers.js";
 import { verFactura } from "./facturaModal.js";
 
 const UMBRAL_FC = 35, DIAS_VIEJO = 30, DIAS_VENCER = 7, SIN_SECTOR = "Sin sector";
 const val = (r) => (r.status === "fulfilled" ? r.value : []);
 const sum = (arr, f = (x) => x.monto_centavos) => arr.reduce((a, x) => a + (Number(f(x)) || 0), 0);
-const hoyStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const addDias = (f, n) => { const d = new Date(f + "T00:00:00"); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const diasHasta = (f) => (f ? Math.ceil((new Date(f + "T12:00:00").getTime() - Date.now()) / 86400000) : null);
+const diasHasta = (f) => (f ? diasEntre(hoyISO(), String(f).slice(0, 10)) : null);
 const diasDesde = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : Infinity);
 const fmtFecha = (iso) => (iso ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit" }).format(new Date(iso)) : "—");
 
@@ -34,7 +33,7 @@ function tabla(cab, filas, vacio) {
 // ================= ADMINISTRATIVO =================
 export async function admin(container) {
   container.innerHTML = "<p class='muted'>Cargando…</p>";
-  const hoy = hoyStr();
+  const hoy = hoyISO();
   const [prov, pend, prog, cajaHoy] = await Promise.allSettled([
     proveedoresRepo.listar(), facturasRepo.pendientesGlobal(),
     agendaRepo.listar(), cajaRepo.listarRango(hoy, hoy),
