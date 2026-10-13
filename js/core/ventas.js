@@ -188,9 +188,9 @@ export function urlWhatsApp(numero, texto) {
   return `https://wa.me/${n}?text=${encodeURIComponent(texto)}`;
 }
 
-/** Caracteres por línea según el ancho del papel de la impresora. */
+/** Caracteres por línea según el ancho del papel de la impresora (misma tabla que ui/impresion.js). */
 export function caracteresPorLinea(anchoMm) {
-  return Number(anchoMm) === 58 ? 32 : 48;
+  return Number(anchoMm) === 58 ? 32 : 42;
 }
 
 /**

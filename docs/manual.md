@@ -232,8 +232,14 @@ turno (con motivo) para corregirlo: los ingresos que se habían volcado al Flujo
 generan de nuevo al cerrar. Los movimientos que genera un cierre no se editan ni borran desde el Flujo de caja.
 
 ### Impresora
-Instalá la térmica como impresora del equipo (cualquier modelo de 58 u 80 mm). Para que imprima sin mostrar el
-diálogo, abrí Chrome con `--kiosk-printing`. Si no, se elige la impresora en el diálogo.
+Instalá la térmica como impresora del equipo (cualquier modelo de 58 u 80 mm).
+1. En **Ventas → Configuración** elegí el ancho del papel y tocá **Imprimir ticket de prueba**.
+2. En el diálogo de imprimir elegí la térmica, **Márgenes: Ninguno** y **Escala: 100 %**. En las preferencias del
+   driver de la impresora, el papel debe ser el **rollo de 58 u 80 mm** (no A4).
+3. El ticket se arma con el ancho y el largo justos del contenido; si sale una tira larga o en blanco, revisá el
+   tamaño de papel del driver.
+4. Para que imprima **sin mostrar el diálogo**, abrí Chrome con `--kiosk-printing` (acceso directo →
+   Propiedades → Destino: agregar `--kiosk-printing`).
 
 ## 6. Configuración
 

@@ -7,7 +7,8 @@
 // ============================================================
 
 import * as ventasRepo from "../data/ventasRepo.js";
-import { MEDIOS_PAGO, NOMBRE_MEDIO, PLANTILLA_COMANDA, textoComanda } from "../../core/ventas.js";
+import { MEDIOS_PAGO, NOMBRE_MEDIO, PLANTILLA_COMANDA, textoComanda, textoTicket } from "../../core/ventas.js";
+import { imprimirTicket } from "./impresion.js";
 import { pesosACentavos } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo } from "./helpers.js";
 
@@ -49,7 +50,10 @@ export async function montar(container, perfil) {
           <div>${labelInfo("vc-ancho", "Papel de la impresora", "Ancho del rollo de la térmica.")}
             <select id="vc-ancho"><option value="58" ${c.ancho_ticket_mm === 58 ? "selected" : ""}>58 mm</option><option value="80" ${c.ancho_ticket_mm === 80 ? "selected" : ""}>80 mm</option></select></div>
         </div>
-        <p class="muted" style="font-size:12.5px;">Para imprimir sin diálogo, instalá la térmica como impresora del equipo y abrí Chrome con el modo kiosco (<code>--kiosk-printing</code>). Si no, aparece el diálogo de imprimir y se elige la térmica.</p>
+        <p class="muted" style="font-size:12.5px;">Instalá la térmica como impresora del equipo. En el diálogo de imprimir elegí esa impresora, <b>Márgenes: Ninguno</b> y <b>Escala: 100 %</b>
+          (en las preferencias del driver, papel de rollo de 58 u 80 mm). Para que imprima sin mostrar el diálogo, abrí Chrome con <code>--kiosk-printing</code>.</p>
+        <button type="button" id="vc-prueba" class="secundario">Imprimir ticket de prueba</button>
+        <span id="vc-prueba-msg" class="muted" style="font-size:12.5px;margin-left:8px;"></span>
         <div>${labelInfo("vc-plantilla", "Texto de la comanda (opcional)", "Dejalo vacío para usar el formato estándar. Marcas: {negocio} {numero} {fecha} {hora} {cliente} {telefono} {modalidad} {direccion} {items} {nota} {total} {pago}. Si una línea queda vacía se omite.")}
           <textarea id="vc-plantilla" rows="8" style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:13px;" placeholder="${escapar(PLANTILLA_COMANDA)}">${escapar(c.plantilla_comanda || "")}</textarea></div>
         <button type="button" id="vc-previa" class="secundario" style="margin-top:8px;">Ver ejemplo</button>
@@ -79,6 +83,21 @@ export async function montar(container, perfil) {
     const pre = $(container, "#vc-ejemplo");
     pre.textContent = textoComanda(ej, { negocio: c.negocio, plantilla: $(container, "#vc-plantilla").value, zona: c.zona_horaria });
     pre.hidden = false;
+  });
+
+  $(container, "#vc-prueba").addEventListener("click", async () => {
+    const msg = $(container, "#vc-prueba-msg");
+    const ancho = Number($(container, "#vc-ancho").value) || 80;
+    const ej = {
+      numero: 1, creado_en: new Date().toISOString(), cliente_nombre: "Ticket de prueba", cliente_telefono: "", modalidad: "retiro", direccion: "",
+      nota: "Si ves esto completo y sin cortes, está bien configurada.", total_centavos: 2350000,
+      items: [{ nombre: "Producto con un nombre bastante largo", cantidad: 2, precio_unit_centavos: 1000000, adicionales: [{ nombre: "Adicional", cantidad: 1, precio_unit_centavos: 150000 }] },
+        { nombre: "Producto B", cantidad: 1, precio_unit_centavos: 200000 }],
+      pagos: [{ medio: "efectivo", monto_centavos: 2350000 }],
+    };
+    msg.textContent = "Enviando a la impresora…";
+    const r = await imprimirTicket(textoTicket(ej, { negocio: c.negocio, plantilla: $(container, "#vc-plantilla").value, zona: c.zona_horaria, anchoMm: ancho }), ancho);
+    msg.textContent = r.ok ? "Enviado. Revisá que salga completo y del largo justo." : "No se pudo imprimir: " + r.error;
   });
 
   $(container, "#vc-form").addEventListener("submit", async (e) => {

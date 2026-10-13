@@ -96,7 +96,7 @@ test("textoTicket: sin asteriscos y líneas que no pasan del ancho del papel", (
     for (const l of t.split("\n")) assert.ok(l.length <= max + 2, `línea de ${l.length} en ${mm} mm: "${l}"`);
   }
   assert.equal(caracteresPorLinea(58), 32);
-  assert.equal(caracteresPorLinea(80), 48);
+  assert.equal(caracteresPorLinea(80), 42);
 });
 
 test("urlWhatsApp: solo dígitos y texto codificado", () => {
