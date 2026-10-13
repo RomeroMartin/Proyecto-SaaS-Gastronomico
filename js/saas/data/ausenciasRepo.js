@@ -23,7 +23,7 @@ export const TIPOS_AUSENCIA = [
 
 /** Lista las ausencias de un empleado (opcionalmente de un año). */
 export async function listar(empleadoId, anio) {
-  let q = supabase.from("ausencias").select("*").eq("empleado_id", empleadoId);
+  let q = supabase.from("ausencias").select("*").eq("empleado_id", empleadoId).eq("activo", true);
   if (anio) q = q.gte("desde", `${anio}-01-01`).lte("desde", `${anio}-12-31`);
   q = q.order("desde", { ascending: false });
   const { data, error } = await q;
@@ -70,8 +70,8 @@ export async function crear(empleadoId, d) {
   return data;
 }
 
-/** Elimina una ausencia (dato operativo, no legal; se puede borrar). */
+/** Baja lógica de una ausencia (nada se borra: queda `activo = false`). */
 export async function eliminar(id) {
-  const { error } = await supabase.from("ausencias").delete().eq("id", id);
+  const { error } = await supabase.from("ausencias").update({ activo: false }).eq("id", id);
   if (error) throw error;
 }

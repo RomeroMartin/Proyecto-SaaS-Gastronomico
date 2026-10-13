@@ -1,8 +1,8 @@
 // ============================================================
 // saas/data/usuariosRepo.js — Usuarios de la empresa (Configuración)
 // ------------------------------------------------------------
-// Alta de cuentas nuevas se hace desde Supabase (Authentication) o por
-// auto-registro; acá gestionamos rol y estado (solo ADMIN, por RLS).
+// La cuenta se crea en Supabase → Authentication y se VINCULA a la empresa con
+// vincular_usuario(); acá además se gestiona rol y estado (solo ADMIN, por RLS).
 // ============================================================
 
 import { supabase } from "../../config/supabase.js";
@@ -22,7 +22,18 @@ export async function actualizar(id, datos) {
   const permitidos = ["rol", "activo", "nombre"];
   const payload = {};
   for (const k of permitidos) if (k in datos) payload[k] = datos[k];
-  payload.modificado_en = new Date().toISOString();
   const { error } = await supabase.from("usuarios").update(payload).eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * Vincula a la empresa una cuenta ya creada en Supabase → Authentication
+ * (RPC vincular_usuario, solo ADMIN). Devuelve el id del usuario.
+ */
+export async function vincular(email, rol, nombre) {
+  const { data, error } = await supabase.rpc("vincular_usuario", {
+    p_email: (email || "").trim(), p_rol: rol, p_nombre: (nombre || "").trim() || null,
+  });
+  if (error) throw error;
+  return data;
 }

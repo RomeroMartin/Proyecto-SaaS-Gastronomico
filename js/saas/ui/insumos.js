@@ -346,11 +346,11 @@ function modalPrecio(insumo) {
     if (nb == null) { setMsg(body.querySelector("#ip-msg"), "Ingresá un precio válido.", "error"); return; }
     setMsg(body.querySelector("#ip-msg"), "Guardando…");
     try {
-      await insumosRepo.actualizarCosto(PERFIL.empresa_id, insumo.id, nb, {
+      const r = await insumosRepo.actualizarCosto(PERFIL.empresa_id, insumo.id, nb, {
         origen: "manual",
         presentacion_precio_neto_centavos: tienePres ? pesosACentavos(body.querySelector("#ip-precio").value) : null,
       });
-      let n = 0; try { n = await recetasRepo.recalcularTodas(); } catch (_e) {}
+      const n = (r && r.recetas_recalculadas) || 0;   // las recetas las recalcula la base
       cerrarModal();
       toast(`Precio actualizado ✔ · ${n} receta(s) recalculada(s)`);
       await refrescar(CONT);
@@ -436,7 +436,9 @@ async function guardarEdicion(e, body, insumo) {
   setMsg(msg, "Guardando…");
   try {
     await catalogos.asegurar(PERFIL.empresa_id, "rubro", rubro);
-    await insumosRepo.actualizarMeta(insumo.id, {
+    // Datos + costo en UNA transacción: si cambió el costo queda en el historial y
+    // la base recalcula las recetas.
+    const r = await insumosRepo.actualizar(insumo.id, {
       nombre, rubro,
       proveedor_habitual_id: body.querySelector("#ins-prov").value || null,
       alicuota_iva: Number(body.querySelector("#ins-iva").value) || 0,
@@ -450,14 +452,8 @@ async function guardarEdicion(e, body, insumo) {
       presentacion_magnitud: c.presentacion.magnitud,
       presentacion_cantidad: c.presentacion.cantidad,
       presentacion_unidad: c.presentacion.unidad,
-    });
-    // Si cambió el costo (precio o cantidad), queda registrado en el historial.
-    if (c.costoNetoBase !== Number(insumo.costo_neto_por_unidad_base_centavos)) {
-      await insumosRepo.actualizarCosto(PERFIL.empresa_id, insumo.id, c.costoNetoBase, {
-        origen: "manual", presentacion_precio_neto_centavos: c.precioCentavos,
-      });
-    }
-    let n = 0; try { n = await recetasRepo.recalcularTodas(); } catch (_e) {}
+    }, c.costoNetoBase);
+    const n = (r && r.recetas_recalculadas) || 0;
     cerrarModal();
     toast(n ? `Insumo actualizado ✔ · ${n} receta(s) recalculada(s)` : "Insumo actualizado ✔");
     await refrescar(CONT);

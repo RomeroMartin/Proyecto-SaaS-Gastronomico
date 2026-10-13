@@ -31,6 +31,7 @@ export async function sesionActual() {
 /**
  * Perfil del usuario logueado: fila de `usuarios` + nombre de su empresa.
  * Devuelve null si el usuario autenticado todavía no tiene empresa asignada.
+ * Un usuario DESACTIVADO viene con `activo: false` (la app lo desloguea).
  */
 export async function miPerfil() {
   const { data: userData } = await supabase.auth.getUser();
@@ -47,7 +48,7 @@ export async function miPerfil() {
 
   const { data: empresa } = await supabase
     .from("empresas")
-    .select("id, nombre, costea_con_iva")
+    .select("id, nombre, costea_con_iva, zona_horaria, condicion_fiscal")
     .eq("id", perfil.empresa_id)
     .maybeSingle();
 

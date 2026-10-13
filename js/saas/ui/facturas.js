@@ -8,7 +8,6 @@
 import * as facturasRepo from "../data/facturasRepo.js";
 import * as proveedoresRepo from "../data/proveedoresRepo.js";
 import * as insumosRepo from "../data/insumosRepo.js";
-import * as recetasRepo from "../data/recetasRepo.js";
 import { ALICUOTAS_IVA, desglosarFactura } from "../../core/fiscal.js";
 import { UNIDADES_POR_MAGNITUD, convertirAUnidadBase, factorAUnidadBase, costoNetoPorUnidadBase } from "../../core/unidades.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
@@ -344,10 +343,11 @@ async function guardar(e, container, lista) {
     // Actualizar costos de insumos + recalcular recetas.
     let recetasActualizadas = 0;
     if (items.length) {
+      // Cada actualización deja su historial y la base recalcula las recetas.
       for (const it of items) {
-        await insumosRepo.actualizarCosto(PERFIL.empresa_id, it.insumoId, it.costo, { origen: "factura", factura_id: facturaId });
+        const r = await insumosRepo.actualizarCosto(PERFIL.empresa_id, it.insumoId, it.costo, { origen: "factura", factura_id: facturaId });
+        recetasActualizadas += (r && r.recetas_recalculadas) || 0;
       }
-      try { recetasActualizadas = await recetasRepo.recalcularTodas(); } catch (_e) {}
       // Refrescar insumos en memoria para próximos cálculos.
       try { INSUMOS = await insumosRepo.listar(); insMap = Object.fromEntries(INSUMOS.map((i) => [i.id, i])); } catch (_e) {}
     }

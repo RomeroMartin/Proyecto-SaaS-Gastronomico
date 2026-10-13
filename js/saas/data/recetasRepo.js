@@ -11,17 +11,6 @@ import { supabase } from "../../config/supabase.js";
 import * as insumosRepo from "./insumosRepo.js";
 import { costoReceta } from "../../core/costeo.js";
 
-/** Genera el próximo código legible tipo "REC-001". */
-function siguienteCodigo(prefijo, existentes) {
-  let max = 0;
-  const re = new RegExp(`^${prefijo}-(\\d+)$`);
-  for (const it of existentes || []) {
-    const m = re.exec(it.codigo || "");
-    if (m) max = Math.max(max, parseInt(m[1], 10));
-  }
-  return `${prefijo}-${String(max + 1).padStart(3, "0")}`;
-}
-
 /** Convierte una fila de ingredientes_receta al shape que espera core/costeo. */
 function mapIngrediente(row) {
   return {
@@ -57,102 +46,63 @@ export async function listar() {
   }));
 }
 
-function payloadReceta(empresaId, datos, costoCalculadoCentavos, creadoPor) {
-  const esPlato = datos.tipo !== "preparacion";
+/** Datos de la receta en el formato de la RPC guardar_receta. */
+function datosRpc(datos) {
   return {
-    empresa_id: empresaId,
     nombre: (datos.nombre || "").trim(),
-    tipo: esPlato ? "plato" : "preparacion",
+    tipo: datos.tipo === "preparacion" ? "preparacion" : "plato",
     rendimiento_cantidad: Number(datos.rendimiento_cantidad) || 1,
     rendimiento_unidad: (datos.rendimiento_unidad || "un").trim() || "un",
-    precio_venta_publico_centavos: esPlato ? (Number(datos.precio_venta_publico_centavos) || 0) : 0,
-    alicuota_venta: esPlato ? (Number(datos.alicuota_venta) || 0) : 0,
-    sector_venta: esPlato ? ((datos.sector_venta || "").trim() || null) : null,
-    costo_calculado_centavos: Math.round(costoCalculadoCentavos) || 0,
-    fecha_calculo: new Date().toISOString(),
-    creado_por: creadoPor || null,
+    precio_venta_publico_centavos: Number(datos.precio_venta_publico_centavos) || 0,
+    alicuota_venta: Number(datos.alicuota_venta) || 0,
+    sector_venta: (datos.sector_venta || "").trim() || null,
   };
 }
 
-/** Filas de ingredientes_receta a insertar para una receta dada. */
-function filasIngredientes(empresaId, recetaId, ingredientes) {
-  return (ingredientes || []).map((ing, i) => ({
-    empresa_id: empresaId,
-    receta_padre_id: recetaId,
-    insumo_id: ing.tipo === "insumo" ? ing.ref_id : null,
-    subreceta_hija_id: ing.tipo === "receta" ? ing.ref_id : null,
+/** Ingredientes en el formato de la RPC: [{tipo, ref_id, cantidad}] (cantidad en unidad base). */
+function ingredientesRpc(ingredientes) {
+  return (ingredientes || []).map((ing) => ({
+    tipo: ing.tipo === "receta" ? "receta" : "insumo",
+    ref_id: ing.ref_id,
     cantidad: Number(ing.cantidad) || 0,
-    porcentaje_merma: Number(ing.porcentaje_merma) || 0,
-    orden: i,
   }));
 }
 
-/** Crea una receta + sus ingredientes. Devuelve el id. */
-export async function crear(empresaId, datos, ingredientes, costoCalculadoCentavos = 0) {
+/**
+ * Crea una receta + sus ingredientes (RPC guardar_receta: todo o nada). La base
+ * valida ciclos, calcula el costo y asigna el código REC-nnn. Devuelve el id.
+ * El 4.º parámetro (costo) se mantiene por compatibilidad y se ignora: el costo
+ * lo calcula la base.
+ */
+export async function crear(empresaId, datos, ingredientes, _costoIgnorado = 0) {
   if (!empresaId) throw new Error("Falta la empresa del usuario.");
   if (!datos.nombre || !datos.nombre.trim()) throw new Error("El nombre es obligatorio.");
-
-  const { data: userData } = await supabase.auth.getUser();
-  const creadoPor = userData && userData.user ? userData.user.id : null;
-
-  const { data: existentes } = await supabase.from("recetas").select("codigo");
-  const codigo = (datos.codigo || "").trim() || siguienteCodigo("REC", existentes || []);
-
-  const payload = { ...payloadReceta(empresaId, datos, costoCalculadoCentavos, creadoPor), codigo };
-  const { data: receta, error } = await supabase.from("recetas").insert(payload).select().single();
+  const { data, error } = await supabase.rpc("guardar_receta", {
+    p_id: null, p_datos: datosRpc(datos), p_ingredientes: ingredientesRpc(ingredientes),
+  });
   if (error) throw error;
-
-  const filas = filasIngredientes(empresaId, receta.id, ingredientes);
-  if (filas.length) {
-    const { error: e2 } = await supabase.from("ingredientes_receta").insert(filas);
-    if (e2) throw e2;
-  }
-  return receta.id;
+  return data;
 }
 
-/** Actualiza una receta: reemplaza sus datos e ingredientes. */
-export async function actualizar(empresaId, id, datos, ingredientes, costoCalculadoCentavos = 0) {
-  const payload = payloadReceta(empresaId, datos, costoCalculadoCentavos);
-  delete payload.creado_por;
-  const { error } = await supabase.from("recetas").update(payload).eq("id", id);
+/** Actualiza una receta: datos e ingredientes en una sola transacción (si falla, queda como estaba). */
+export async function actualizar(empresaId, id, datos, ingredientes, _costoIgnorado = 0) {
+  const { error } = await supabase.rpc("guardar_receta", {
+    p_id: id, p_datos: datosRpc(datos), p_ingredientes: ingredientesRpc(ingredientes),
+  });
   if (error) throw error;
-
-  const { error: eDel } = await supabase.from("ingredientes_receta").delete().eq("receta_padre_id", id);
-  if (eDel) throw eDel;
-
-  const filas = filasIngredientes(empresaId, id, ingredientes);
-  if (filas.length) {
-    const { error: eIns } = await supabase.from("ingredientes_receta").insert(filas);
-    if (eIns) throw eIns;
-  }
-}
-
-/** Persiste solo el snapshot de costo (recálculo por lote). */
-export async function guardarCosto(id, costoCalculadoCentavos) {
-  const { error } = await supabase.from("recetas")
-    .update({ costo_calculado_centavos: Math.round(costoCalculadoCentavos) || 0, fecha_calculo: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
+  return id;
 }
 
 /**
- * Recalcula el costo (snapshot) de TODAS las recetas de la empresa y persiste
- * las que cambiaron. Se usa tras actualizar precios de insumos.
- * @returns {number} cantidad de recetas actualizadas
+ * Recalcula el costo (snapshot) de TODAS las recetas de la empresa en la base
+ * (RPC recalcular_costos). Ya no hace falta llamarla tras cambiar un insumo: los
+ * triggers y las RPC lo hacen solas; queda para el botón "Recalcular".
+ * @returns {number} cantidad de recetas que cambiaron
  */
 export async function recalcularTodas() {
-  const [recetas, insumos] = await Promise.all([listar(), insumosRepo.listar()]);
-  const insMap = Object.fromEntries(insumos.map((i) => [i.id, i]));
-  const recMap = Object.fromEntries(recetas.map((r) => [r.id, r]));
-  const ctx = { getInsumo: (id) => insMap[id] || null, getReceta: (id) => recMap[id] || null };
-  let n = 0;
-  for (const r of recetas) {
-    try {
-      const costo = Math.round(costoReceta(r, ctx));
-      if (costo !== (Number(r.costo_calculado_centavos) || 0)) { await guardarCosto(r.id, costo); n++; }
-    } catch (_e) { /* ciclo/insumo faltante: se omite */ }
-  }
-  return n;
+  const { data, error } = await supabase.rpc("recalcular_costos");
+  if (error) throw error;
+  return Number(data) || 0;
 }
 
 /** Baja lógica. */

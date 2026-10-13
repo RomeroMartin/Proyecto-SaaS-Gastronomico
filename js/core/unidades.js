@@ -10,7 +10,6 @@
 // Este módulo NO conoce Firebase ni el DOM.
 // ============================================================
 
-import { redondearCentavos } from "./dinero.js";
 
 /** Magnitudes soportadas y su unidad base canónica. */
 export const MAGNITUDES = {
@@ -94,19 +93,22 @@ export function convertirDesdeUnidadBase(cantidadBase, unidad) {
 
 /**
  * A partir de una presentación de compra, deriva el costo NETO por unidad base,
- * en centavos (entero). Es el valor que se guarda en
- * `insumo.costo_neto_por_unidad_base_centavos`.
+ * en centavos. Es el valor que se guarda en
+ * `insumo.costo_neto_por_unidad_base_centavos` (numeric en la base).
  *
  * Ej: barra 5 kg (5000 g) a $34.000 neto (3.400.000 centavos)
  *     → 3.400.000 / 5000 = 680 centavos por gramo.
  *
+ * Conserva 4 decimales: un insumo de $125/kg cuesta 12,5 ¢/g (antes se
+ * redondeaba a 13 ¢ y el costo de las recetas salía 4 % de más).
+ *
  * @param {number} precioNetoCentavos  precio neto de la presentación, en centavos
  * @param {number} cantidadBase        cantidad de la presentación, en unidad base
- * @returns {number} centavos por unidad base (entero, redondeado)
+ * @returns {number} centavos por unidad base (hasta 4 decimales)
  */
 export function costoNetoPorUnidadBase(precioNetoCentavos, cantidadBase) {
   if (!cantidadBase || cantidadBase <= 0) {
     throw new Error("La cantidad base de la presentación debe ser > 0.");
   }
-  return redondearCentavos((Number(precioNetoCentavos) || 0) / cantidadBase);
+  return Math.round(((Number(precioNetoCentavos) || 0) / cantidadBase) * 10000) / 10000;
 }

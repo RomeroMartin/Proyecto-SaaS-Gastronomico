@@ -7,7 +7,8 @@
 // ============================================================
 
 import { login, logout, sesionActual, miPerfil } from "../auth.js";
-import { mostrar, setMsg } from "./helpers.js";
+import { mostrar, setMsg, escapar } from "./helpers.js";
+import { setZonaHoraria } from "../../core/utilsFecha.js";
 import * as catalogos from "../data/catalogosRepo.js";
 import * as resumenes from "./resumenes.js";
 import * as proveedores from "./proveedores.js";
@@ -86,6 +87,7 @@ const MENU = [
       { clave: "cfg_empresa", titulo: "Empresa", montar: config.empresa },
       { clave: "cfg_usuarios", titulo: "Usuarios y roles", montar: config.usuarios },
       { clave: "cfg_catalogos", titulo: "Catálogos", montar: config.catalogosCfg },
+      { clave: "cfg_auditoria", titulo: "Auditoría", montar: config.auditoria, roles: ["ADMIN"] },
     ],
   },
 ];
@@ -132,9 +134,20 @@ async function entrarApp() {
   perfil = await miPerfil();
   if (!perfil) {
     setMsg($("#login-msg"),
-      "Tu usuario no tiene empresa asignada. Corré supabase/bootstrap.sql.", "error");
+      "Tu usuario no tiene empresa asignada. Pedile al administrador que te vincule (si sos el primer usuario, corré supabase/bootstrap.sql).", "error");
     return;
   }
+  if (perfil.activo === false) {
+    // Usuario desactivado: la base ya no le muestra datos; además se cierra la sesión.
+    await logout();
+    perfil = null;
+    mostrar($("#app"), false);
+    mostrar($("#login"), true);
+    setMsg($("#login-msg"), "Tu usuario está desactivado. Contactá al administrador.", "error");
+    return;
+  }
+  // La fecha de negocio ("hoy") se calcula en la zona horaria de la empresa.
+  setZonaHoraria(perfil.empresa && perfil.empresa.zona_horaria);
   mostrar($("#login"), false);
   mostrar($("#app"), true);
 
@@ -221,7 +234,7 @@ async function irA(clave) {
   try {
     await item.montar(cont, perfil);
   } catch (err) {
-    cont.innerHTML = `<p class="error">Error: ${err.message || err}</p>`;
+    cont.innerHTML = `<p class="error">Error: ${escapar(err.message || String(err))}</p>`;
   }
 }
 

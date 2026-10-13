@@ -19,3 +19,12 @@ export async function actualizar(id, datos) {
   const { error } = await supabase.from("empresas").update(payload).eq("id", id);
   if (error) throw error;
 }
+
+/**
+ * Cambia un parámetro sensible de la empresa (RPC set_config_empresa, solo ADMIN,
+ * auditado). Claves: "zona_horaria", "condicion_fiscal".
+ */
+export async function setConfig(clave, valor) {
+  const { error } = await supabase.rpc("set_config_empresa", { p_clave: clave, p_valor: valor });
+  if (error) throw error;
+}
