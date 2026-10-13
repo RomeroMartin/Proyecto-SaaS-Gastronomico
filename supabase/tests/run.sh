@@ -66,5 +66,11 @@ for t in "$DIR"/tests/[1-9]*.sql; do
   fi
 done
 
+echo "▶ Idempotencia: re-ejecutar f0_* sobre la base ya migrada"
+for s in f0_roles_rls f0_auditoria f0_usuarios f0_empresas_columnas f0_zona_horaria f0_integridad f0_costeo f0_rpc_atomicas; do
+  sql "$DIR/$s.sql"
+done
+echo "   ✓ re-ejecución sin errores"
+
 if [ "$fallos" -gt 0 ]; then echo "✗ $fallos archivo(s) de test con fallas"; exit 1; fi
 echo "✓ Todos los tests SQL pasaron"

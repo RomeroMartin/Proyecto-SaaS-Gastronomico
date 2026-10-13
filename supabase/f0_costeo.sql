@@ -22,9 +22,22 @@
 -- ============================================================================
 
 -- ---- Precisión del costo por unidad base ----
-alter table insumos alter column costo_neto_por_unidad_base_centavos type numeric(18,6);
-alter table historial_precios_insumo alter column costo_anterior_centavos type numeric(18,6);
-alter table historial_precios_insumo alter column costo_nuevo_centavos type numeric(18,6);
+do $$
+declare c record;
+begin
+  for c in select * from (values
+      ('insumos','costo_neto_por_unidad_base_centavos'),
+      ('historial_precios_insumo','costo_anterior_centavos'),
+      ('historial_precios_insumo','costo_nuevo_centavos')) v(t,col)
+  loop
+    -- Solo si todavía no tiene la precisión nueva (re-ejecutable aunque existan triggers).
+    if not exists (select 1 from information_schema.columns
+                   where table_schema = 'public' and table_name = c.t and column_name = c.col
+                     and numeric_precision = 18 and numeric_scale = 6) then
+      execute format('alter table %I alter column %I type numeric(18,6)', c.t, c.col);
+    end if;
+  end loop;
+end $$;
 
 comment on column ingredientes_receta.porcentaje_merma is
   'DEPRECADA: no se usa. La merma se modela con insumos.factor_correccion.';
