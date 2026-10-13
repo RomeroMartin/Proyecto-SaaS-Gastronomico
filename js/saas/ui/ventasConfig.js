@@ -8,7 +8,7 @@
 
 import * as ventasRepo from "../data/ventasRepo.js";
 import { MEDIOS_PAGO, NOMBRE_MEDIO, PLANTILLA_COMANDA, textoComanda, textoTicket } from "../../core/ventas.js";
-import { imprimirTicket } from "./impresion.js";
+import { imprimirTicket, MODOS_PAPEL, getModoPapel, setModoPapel } from "./impresion.js";
 import { pesosACentavos } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo } from "./helpers.js";
 
@@ -52,7 +52,9 @@ export async function montar(container, perfil) {
         </div>
         <p class="muted" style="font-size:12.5px;">Instalá la térmica como impresora del equipo. En el diálogo de imprimir elegí esa impresora, <b>Márgenes: Ninguno</b> y <b>Escala: 100 %</b>
           (en las preferencias del driver, papel de rollo de 58 u 80 mm). Para que imprima sin mostrar el diálogo, abrí Chrome con <code>--kiosk-printing</code>.</p>
-        <button type="button" id="vc-prueba" class="secundario">Imprimir ticket de prueba</button>
+        <div class="fila"><div>${labelInfo("vc-papel", "Papel de la impresora (solo este equipo)", "Cada impresora se comporta distinto. Probá con 'Ajustado'. Si sale girado, en una tira larga o cortado, probá 'Usar el papel del driver' (el driver tiene que tener el rollo de 58/80 mm). Se guarda en este equipo.")}
+          <select id="vc-papel">${Object.entries(MODOS_PAPEL).map(([v, l]) => `<option value="${v}" ${getModoPapel() === v ? "selected" : ""}>${escapar(l)}</option>`).join("")}</select></div></div>
+        <button type="button" id="vc-prueba" class="secundario" style="margin-top:8px;">Imprimir ticket de prueba</button>
         <span id="vc-prueba-msg" class="muted" style="font-size:12.5px;margin-left:8px;"></span>
         <div>${labelInfo("vc-plantilla", "Texto de la comanda (opcional)", "Dejalo vacío para usar el formato estándar. Marcas: {negocio} {numero} {fecha} {hora} {cliente} {telefono} {modalidad} {direccion} {items} {nota} {total} {pago}. Si una línea queda vacía se omite.")}
           <textarea id="vc-plantilla" rows="8" style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:13px;" placeholder="${escapar(PLANTILLA_COMANDA)}">${escapar(c.plantilla_comanda || "")}</textarea></div>
@@ -85,6 +87,7 @@ export async function montar(container, perfil) {
     pre.hidden = false;
   });
 
+  $(container, "#vc-papel").addEventListener("change", (e) => setModoPapel(e.target.value));
   $(container, "#vc-prueba").addEventListener("click", async () => {
     const msg = $(container, "#vc-prueba-msg");
     const ancho = Number($(container, "#vc-ancho").value) || 80;
@@ -96,7 +99,7 @@ export async function montar(container, perfil) {
       pagos: [{ medio: "efectivo", monto_centavos: 2350000 }],
     };
     msg.textContent = "Enviando a la impresora…";
-    const r = await imprimirTicket(textoTicket(ej, { negocio: c.negocio, plantilla: $(container, "#vc-plantilla").value, zona: c.zona_horaria, anchoMm: ancho }), ancho);
+    const r = await imprimirTicket(textoTicket(ej, { negocio: c.negocio, plantilla: $(container, "#vc-plantilla").value, zona: c.zona_horaria, anchoMm: ancho }), ancho, $(container, "#vc-papel").value);
     msg.textContent = r.ok ? "Enviado. Revisá que salga completo y del largo justo." : "No se pudo imprimir: " + r.error;
   });
 

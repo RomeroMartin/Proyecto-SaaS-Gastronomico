@@ -14,8 +14,25 @@ test("medidasTicket: la página mide el ancho del rollo y el alto del contenido 
   assert.equal(m80.anchoMm, 80);
   assert.equal(m58.anchoMm, 58);
   assert.ok(m80.altoMm > 30 && m80.altoMm < 120, "alto razonable: " + m80.altoMm);
-  assert.ok(medidasTicket(texto + "\nmás\nlíneas", 80).altoMm > m80.altoMm, "más líneas → más alto");
+  const largo = Array.from({ length: 40 }, (_, i) => "línea " + i).join("\n");
+  assert.ok(medidasTicket(largo, 80).altoMm > medidasTicket(texto, 80).altoMm, "más líneas → más alto");
   assert.equal(medidasTicket(texto, 99).anchoMm, 80); // ancho desconocido → 80
+});
+
+test("la página SIEMPRE es más alta que ancha (si no, el driver la gira 90°)", () => {
+  for (const mm of [58, 80]) {
+    for (const n of [1, 3, 12, 40]) {
+      const m = medidasTicket(Array.from({ length: n }, () => "x").join("\n"), mm);
+      assert.ok(m.altoMm > m.anchoMm, `${n} líneas en ${mm} mm: ${m.anchoMm} x ${m.altoMm}`);
+    }
+  }
+});
+
+test("modo 'driver': no declara tamaño de página (usa el papel del driver)", () => {
+  const html = htmlTicket("hola", 80, "driver");
+  assert.match(html, /@page \{ margin: 0; \}/);
+  assert.doesNotMatch(html, /size:/);
+  assert.match(html, /width: 80mm/);
 });
 
 test("la letra hace entrar exactamente las columnas en el ancho imprimible", () => {
