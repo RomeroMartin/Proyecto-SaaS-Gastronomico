@@ -617,6 +617,26 @@ Validar estas dependencias con un `check` o un trigger (mensaje claro).
 
 ## Fase 2 — Ventas (mostrador)
 
+> **Estado:** entrega 1/2 hecha (base de datos + lógica pura + tests):
+> `f2_ventas.sql`, `f2_caja_ventas.sql`, `f2_ventas_rpc.sql` (o `f2_aplicar_todo.sql`),
+> `js/core/ventas.js`. Falta la entrega 2/2: pantallas (Mostrador, Historial,
+> Configuración, campos de venta en recetas) y el ajuste del Flujo de caja.
+> Cambios respecto de lo escrito abajo:
+> - La config de ventas se cambia con **`set_config_ventas`** (solo ADMIN, auditada),
+>   no con `set_config_empresa` (así no se pisa al re-ejecutar la Fase 0).
+> - Orden de scripts: `f2_ventas` → `f2_caja_ventas` → `f2_ventas_rpc` (la caja
+>   referencia a `turnos_caja`).
+> - Se marca una receta como vendible con **`configurar_venta_receta`** (ADMIN/GERENTE/COCINA).
+> - **Comanda configurable por empresa** (`modo_comanda`: `whatsapp` | `impresora` |
+>   `impresora_whatsapp`; `ancho_ticket_mm`: 58/80; `plantilla_comanda`).
+>   Impresión v1 = `window.print()` sobre una hoja angosta (sirve para cualquier
+>   térmica instalada como impresora del sistema; modo kiosco de Chrome para evitar
+>   el diálogo). Si falla, la pantalla ofrece **Enviar por WhatsApp** como respaldo.
+>   `registrar_comanda` deja constancia de cómo salió (`pedidos.comanda_via`).
+>   Más adelante, opcional: WebUSB / puente ESC/POS.
+> - El borrado en el Flujo de caja pasó a baja lógica (trigger), así el frontend
+>   anterior no se rompe; los movimientos de cierre no se editan ni borran.
+
 **Objetivo:** un módulo dentro del SaaS, sobre Supabase, conectado a la carta y
 a la caja, **genérico para cualquier local con mostrador o venta rápida**.
 
@@ -1282,7 +1302,7 @@ pero la pantalla llega después. Cada una se prioriza con el siguiente cliente.
 - **Propinas** y recargos por medio de pago.
 - **Cola offline** del mostrador (service worker + sincronización con
   `client_uuid`).
-- **Impresión de comandas** y tickets no fiscales.
+- Impresión directa sin diálogo (WebUSB / puente ESC/POS) y tickets fiscales. La impresión básica de comandas sí está en la Fase 2.
 - **Inventario / stock:** descuento por venta, conteos, y con eso el "food cost
   real". Hasta entonces, CMV teórico + compras.
 - **Facturación electrónica (ARCA):** requiere certificado y un servidor; no es
@@ -1356,8 +1376,9 @@ Los existentes quedan como están.
 | 7 | `f0_costeo.sql` (`costo_receta`, `recalcular_costos`, precisión) | 0.7 |
 | 8 | `f0_rpc_atomicas.sql` (`guardar_receta`, `crear_insumo`, …) | 0.6 |
 | 9 | `f1_modulos_empresa.sql` | 1 |
-| 10 | `f2_caja_ventas.sql` (cambios a `movimientos_caja`) | 2.5 |
-| 11 | `f2_ventas.sql` (tablas + RPC + `fecha_operativa`) | 2 |
+| 10 | `f2_ventas.sql` (config, tablas, RLS, `fecha_operativa`) | 2 |
+| 11 | `f2_caja_ventas.sql` (cambios a `movimientos_caja`) | 2.5 |
+| 11b | `f2_ventas_rpc.sql` (RPC del mostrador) | 2.4 |
 | 12 | `f3_ventas_reportes.sql` | 3 |
 | 13 | `f4_reparto.sql` | 4 |
 
@@ -1403,7 +1424,7 @@ configuración y comanda) → Fase 3 → Fase 4 → Fase 5.**
 
 - Facturación electrónica / ARCA (ver Fase 6; dejar el modelo listo).
 - Pedidos online hechos por el cliente final.
-- Salón, mesas, mozos, impresión de comandas.
+- Salón, mesas, mozos.
 - Descuento de stock por venta (llega con inventario).
 - Cola offline del mostrador (v1 solo avisa y bloquea).
 

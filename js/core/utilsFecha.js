@@ -39,6 +39,26 @@ export function fechaEnZona(instante = new Date(), zona = ZONA) {
   }).format(instante);
 }
 
+/**
+ * Día de negocio ("fecha operativa") de un instante: si en la zona de la empresa
+ * es anterior a la hora de corte, pertenece al día anterior (un local que cierra
+ * pasada la medianoche vende "el día de ayer"). Espejo de fecha_operativa() en
+ * supabase/f2_ventas.sql: los tests de ambos lados usan los mismos casos.
+ * @param {Date} instante
+ * @param {string} zona   IANA
+ * @param {string} corte  "HH:MM" (default "06:00")
+ */
+export function fechaOperativa(instante = new Date(), zona = ZONA, corte = "06:00") {
+  const hm = /^(\d{1,2}):(\d{2})/.exec(String(corte || "06:00")) || [null, "6", "00"];
+  const corteMin = (+hm[1]) * 60 + (+hm[2]);
+  const f = new Intl.DateTimeFormat("en-GB", {
+    timeZone: zona || ZONA_POR_DEFECTO, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(instante);
+  const h = +f.find((x) => x.type === "hour").value, m = +f.find((x) => x.type === "minute").value;
+  const fecha = fechaEnZona(instante, zona);
+  return (h * 60 + m) < corteMin ? addDias(fecha, -1) : fecha;
+}
+
 /** Fecha de hoy en formato ISO "YYYY-MM-DD", en la zona horaria de la empresa. */
 export function hoyISO(zona = ZONA, ahora = new Date()) {
   return fechaEnZona(ahora, zona);
