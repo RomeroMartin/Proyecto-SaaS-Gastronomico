@@ -58,6 +58,7 @@ function render(container, movimientos) {
     </div>
     <p class="muted" style="margin-top:-8px;text-transform:capitalize;">${escapar(fmtDia(dia))}</p>
 
+    ${avisoDuplicado(delDia)}
     <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
       ${kpiHTML("Ingresos del día", formatearCentavos(totIng), `${ingresos.length} mov.`, "ok",
         "Todo lo que entró: ventas en efectivo, tarjeta, QR, transferencias, etc.")}
@@ -120,12 +121,25 @@ function render(container, movimientos) {
   container.querySelectorAll(".caja-del").forEach((b) => b.addEventListener("click", () => eliminar(container, b.dataset.id)));
 }
 
+// Los movimientos que genera una venta (cierre de caja / salida del turno) no se borran:
+// para corregirlos un ADMIN reabre el turno en Ventas.
+const ETIQUETA_ORIGEN = { cierre_turno: "Cierre de caja", turno: "Salida del turno" };
+
+// Ingresos de ventas cargados a mano el mismo día que hay un cierre automático: posible doble carga.
+function avisoDuplicado(delDia) {
+  const hayCierre = delDia.some((m) => m.origen === "cierre_turno");
+  const manualVentas = delDia.filter((m) => (m.origen || "manual") === "manual" && m.tipo === "ingreso" && /^ventas/i.test(m.categoria || ""));
+  if (!hayCierre || !manualVentas.length) return "";
+  return `<div class="card" style="border-color:#fed7aa;background:#fff7ed;"><b>Posible duplicado:</b> este día tiene un cierre de caja automático y además
+    ${manualVentas.length} ingreso(s) de ventas cargado(s) a mano. Revisá que no estés contando dos veces.</div>`;
+}
+
 function tablaMov(movs) {
   if (!movs.length) return "<p class='muted'>Sin movimientos.</p>";
   const filas = movs.map((m) => `<tr>
-    <td>${escapar(m.categoria || "—")}<div class="muted" style="font-size:11px;">${escapar(labelMedio(m.medio))}${m.nota ? " · " + escapar(m.nota) : ""}</div></td>
+    <td>${escapar(m.categoria || "—")}${ETIQUETA_ORIGEN[m.origen] ? ` <span class="rrhh-pill">${ETIQUETA_ORIGEN[m.origen]}</span>` : ""}<div class="muted" style="font-size:11px;">${escapar(labelMedio(m.medio))}${m.nota ? " · " + escapar(m.nota) : ""}</div></td>
     <td class="num">${formatearCentavos(m.monto_centavos)}</td>
-    <td style="text-align:right;"><button class="btn-baja caja-del" data-id="${m.id}">✕</button></td>
+    <td style="text-align:right;">${(m.origen || "manual") === "manual" ? `<button class="btn-baja caja-del" data-id="${m.id}">✕</button>` : ""}</td>
   </tr>`).join("");
   return `<div class="tabla-scroll"><table><tbody>${filas}</tbody></table></div>`;
 }

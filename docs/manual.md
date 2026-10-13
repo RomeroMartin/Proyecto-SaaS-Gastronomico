@@ -198,6 +198,43 @@ Análisis fino: **food cost % y margen por plato y por sector**, con **semáforo
 
 ---
 
+## 5b. Módulo Ventas (mostrador)
+
+Solo aparece si tu plan incluye **Ventas**. Pensado para locales con mostrador o venta rápida.
+
+### Preparación (una sola vez)
+1. **Ventas → Configuración** (ADMIN): alias de cobro, WhatsApp de cocina, medios de pago, delivery,
+   hora de corte del día y **cómo sale la comanda** (solo WhatsApp, solo impresora, o impresora con
+   WhatsApp de respaldo).
+2. **Rentabilidad de carta → Platos → Editar**: tildá **Se vende en el mostrador**, elegí la categoría de venta
+   y el orden. Si es un extra que se suma a otro producto (ej. medallón extra), tildá **Es un adicional**.
+   Las bebidas y reventa se cargan como platos con un solo ingrediente.
+
+### Uso diario (Ventas → Mostrador)
+- **Abrir caja** con el fondo de cambio. Hay una sola caja abierta por vez.
+- Tocá los productos para armar el pedido; los adicionales se agregan al producto seleccionado.
+  Elegí el medio de pago (con transferencia se muestra el alias para copiar) y **Confirmar pedido**.
+- La **comanda** sale según la configuración: se imprime en la impresora del local y/o se envía por WhatsApp.
+  Si la impresora falla, usá **No salió: enviar por WhatsApp**. Desde "Pedidos del turno" podés reimprimir o reenviar.
+- **Anular** un pedido exige un motivo y queda registrado. **Entregado** marca la entrega.
+- **Salida de efectivo**: plata que sale de la caja durante el turno (hielo, retiro…).
+- **Cerrar caja**: se cuenta el efectivo; el sistema muestra lo esperado y la diferencia, y vuelca las ventas al
+  **Flujo de caja** (un ingreso "Ventas" por medio de pago, en el día operativo).
+- Sin internet aparece una franja roja: anotá en papel y cargá cuando vuelva (los reintentos no duplican pedidos).
+
+### Día operativo
+Lo vendido antes de la **hora de corte** (por defecto 06:00) cuenta para el día anterior: un local que cierra
+pasada la medianoche vende "el día de ayer".
+
+### Historial y correcciones
+**Ventas → Historial de turnos** muestra cada cierre con su resumen y pedidos. Un **ADMIN** puede **reabrir** un
+turno (con motivo) para corregirlo: los ingresos que se habían volcado al Flujo de caja se dan de baja y se
+generan de nuevo al cerrar. Los movimientos que genera un cierre no se editan ni borran desde el Flujo de caja.
+
+### Impresora
+Instalá la térmica como impresora del equipo (cualquier modelo de 58 u 80 mm). Para que imprima sin mostrar el
+diálogo, abrí Chrome con `--kiosk-printing`. Si no, se elige la impresora en el diálogo.
+
 ## 6. Configuración
 
 ### 6.1 Empresa
