@@ -5,14 +5,20 @@
 import * as cajaRepo from "../data/movimientosCajaRepo.js";
 import * as catalogos from "../data/catalogosRepo.js";
 import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
-import { hoyISO, addDias } from "../../core/utilsFecha.js";
+import { hoyISO, addDias, fechaOperativa } from "../../core/utilsFecha.js";
 import { escapar, setMsg, labelInfo, datalist, kpiHTML, toast, confirmar } from "./helpers.js";
 
 const MEDIOS = [["efectivo", "Efectivo"], ["tarjeta", "Tarjeta"], ["qr", "QR"], ["transferencia", "Transferencia"], ["cheque", "Cheque"], ["otro", "Otro"]];
 const labelMedio = (m) => (MEDIOS.find((x) => x[0] === m) || [m, m])[1];
 
 let PERFIL = null;
-let dia = null; // día visible (se inicializa con hoy en la zona de la empresa)
+let dia = null; // día visible (se inicializa con el día operativo en la zona de la empresa)
+
+function diaDeTrabajo() {
+  const corte = PERFIL && PERFIL.empresa && PERFIL.empresa.hora_corte_dia;
+  const conVentas = PERFIL && PERFIL.empresa && Array.isArray(PERFIL.empresa.modulos) && PERFIL.empresa.modulos.includes("ventas");
+  return conVentas && corte ? fechaOperativa(new Date(), undefined, corte) : hoyISO();
+}
 
 const $ = (c, s) => c.querySelector(s);
 function fmtDia(f) { return new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long" }).format(new Date(f + "T00:00:00")); }
@@ -20,7 +26,9 @@ const sum = (arr) => arr.reduce((a, m) => a + (Number(m.monto_centavos) || 0), 0
 
 export async function montar(container, perfil) {
   PERFIL = perfil;
-  if (!dia) dia = hoyISO();
+  // Día en pantalla: el DÍA OPERATIVO actual (si el local cierra pasada la medianoche, las ventas de la
+  // madrugada cuentan para el día anterior). Sin módulo de ventas es simplemente hoy.
+  if (!dia) dia = diaDeTrabajo();
   await cargar(container);
 }
 
@@ -107,7 +115,7 @@ function render(container, movimientos) {
 
   $(container, "#caja-prev").addEventListener("click", () => { dia = addDias(dia, -1); cargar(container); });
   $(container, "#caja-next").addEventListener("click", () => { dia = addDias(dia, 1); cargar(container); });
-  $(container, "#caja-fecha").addEventListener("change", (e) => { dia = e.target.value || hoyISO(); cargar(container); });
+  $(container, "#caja-fecha").addEventListener("change", (e) => { dia = e.target.value || diaDeTrabajo(); cargar(container); });
 
   const tipoSel = $(container, "#caja-tipo");
   const dl = $(container, "#dl-cat-caja");

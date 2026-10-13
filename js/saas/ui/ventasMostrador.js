@@ -14,6 +14,7 @@ import { totalPedido, diferenciaCaja, textoComanda, textoTicket, urlWhatsApp, pl
   NOMBRE_MEDIO } from "../../core/ventas.js";
 import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
 import { escapar, setMsg, toast, abrirModal, cerrarModal } from "./helpers.js";
+import { imprimirTicket } from "./impresion.js";
 
 const $ = (c, s) => c.querySelector(s);
 const $$ = (c, s) => Array.from(c.querySelectorAll(s));
@@ -308,22 +309,9 @@ function opcionesComanda() {
 }
 const plan = () => planDespacho(CFG.modo_comanda, { whatsappConfigurado: !!CFG.whatsapp_cocina });
 
-/** Imprime el ticket en la impresora del sistema (hoja angosta). Devuelve true si se pudo lanzar. */
+/** Imprime el ticket en la impresora del sistema (hoja angosta). Devuelve {ok, error}. */
 function imprimir(pedido) {
-  try {
-    const zona = document.getElementById("zona-impresion");
-    zona.innerHTML = `<style>@page { size: ${CFG.ancho_ticket_mm === 58 ? 58 : 80}mm auto; margin: 3mm; }</style><pre></pre>`;
-    zona.querySelector("pre").textContent = textoTicket(pedido, opcionesComanda());
-    document.body.classList.add("imprimiendo-ticket");
-    const fin = () => { document.body.classList.remove("imprimiendo-ticket"); window.removeEventListener("afterprint", fin); };
-    window.addEventListener("afterprint", fin);
-    window.print();
-    setTimeout(fin, 1500);
-    return true;
-  } catch (_e) {
-    document.body.classList.remove("imprimiendo-ticket");
-    return false;
-  }
+  return imprimirTicket(textoTicket(pedido, opcionesComanda()), CFG.ancho_ticket_mm);
 }
 
 function mostrarConfirmado(p, repetido) {
@@ -348,10 +336,18 @@ function mostrarConfirmado(p, repetido) {
   const estado = $(body, "#mc-estado");
   const marcar = async (via) => { try { await ventasRepo.registrarComanda(p.id, via); p.comanda_via = via; pintarPedidos(); } catch (_e) { /* no bloquea la operación */ } };
   if (pl.principal === "impresora") {
-    const ok = imprimir(p);
-    if (ok) { estado.textContent = "Comanda enviada a la impresora."; marcar("impresora"); }
-    else estado.textContent = "No se pudo imprimir." + (pl.respaldo ? " Usá el botón de WhatsApp." : "");
-    $(body, "#mc-imprimir").addEventListener("click", () => { if (imprimir(p)) { estado.textContent = "Comanda enviada a la impresora."; marcar("impresora"); } });
+    // Imprime y muestra el resultado real (si falla, el motivo y el respaldo por WhatsApp).
+    const lanzar = async () => {
+      estado.textContent = "Enviando a la impresora…";
+      const r = await imprimir(p);
+      if (r.ok) { estado.textContent = "Comanda enviada a la impresora."; marcar("impresora"); }
+      else {
+        estado.style.color = "var(--error)";
+        estado.textContent = "No se pudo imprimir (" + r.error + ")." + (pl.respaldo ? " Usá el botón de WhatsApp." : " Probá de nuevo o revisá la impresora.");
+      }
+    };
+    lanzar();
+    $(body, "#mc-imprimir").addEventListener("click", lanzar);
   }
   const aWa = $(body, "#mc-wa");
   if (aWa) aWa.addEventListener("click", () => marcar("whatsapp"));

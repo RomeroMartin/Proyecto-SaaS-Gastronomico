@@ -212,7 +212,7 @@ create policy leer on pedido_items for select to authenticated using (
 --   • turno_id    turno que lo generó
 --   • activo      baja lógica: nada se borra (si se reabre un turno, sus
 --                 movimientos de cierre quedan inactivos)
--- Un movimiento de cierre ACTIVO por (turno, medio): no se duplican cierres.
+-- Un movimiento de cierre ACTIVO por (turno, medio, tipo, categoría): no se duplican cierres.
 -- "Borrar" desde la app pasa a ser baja lógica (se intercepta el DELETE), para
 -- que el frontend anterior siga funcionando; los movimientos que no son
 -- manuales no se pueden borrar (para corregirlos se reabre el turno).
@@ -227,8 +227,10 @@ alter table movimientos_caja add constraint movimientos_caja_origen_check
 alter table movimientos_caja add column if not exists turno_id uuid references turnos_caja(id) on delete restrict;
 alter table movimientos_caja add column if not exists activo boolean not null default true;
 
-create unique index if not exists ux_movcaja_cierre_turno
-  on movimientos_caja (turno_id, medio) where origen = 'cierre_turno' and activo;
+-- (el cierre genera un ingreso 'Ventas' por medio y, si hay diferencia, una línea de 'Diferencia de caja')
+drop index if exists ux_movcaja_cierre_turno;
+create unique index if not exists ux_movcaja_cierre_turno_v2
+  on movimientos_caja (turno_id, medio, tipo, categoria) where origen = 'cierre_turno' and activo;
 create index if not exists ix_movcaja_turno on movimientos_caja (turno_id) where turno_id is not null;
 
 -- Permisos por columna: lo manual se escribe directo; origen/turno_id/activo, no.
@@ -728,7 +730,7 @@ grant execute on function registrar_egreso_turno(uuid, bigint, text, text) to au
 -- ---------------------------------------------------------------------------
 create or replace function cerrar_turno(p_turno uuid, p_efectivo_contado bigint, p_nota text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare v_empresa uuid; t turnos_caja; v_res jsonb; v_esp bigint; m record; n int;
+declare v_empresa uuid; t turnos_caja; v_res jsonb; v_esp bigint; m record; n int; v_dif bigint;
 begin
   v_empresa := _ventas_empresa();
   select * into t from turnos_caja where id = p_turno and empresa_id = v_empresa for update;
@@ -753,6 +755,15 @@ begin
     values (v_empresa, t.fecha_operativa, 'ingreso', 'Ventas', m.medio, m.monto,
             'Cierre de caja — ' || n || case when n = 1 then ' pedido' else ' pedidos' end, auth.uid(), 'cierre_turno', p_turno);
   end loop;
+
+  -- La diferencia de caja (faltante/sobrante) también pasa al Flujo de caja, para que el
+  -- efectivo del libro coincida con el que realmente hay: faltante = egreso, sobrante = ingreso.
+  v_dif := p_efectivo_contado - v_esp;
+  if v_dif <> 0 then
+    insert into movimientos_caja (empresa_id, fecha, tipo, categoria, medio, monto_centavos, nota, creado_por, origen, turno_id)
+    values (v_empresa, t.fecha_operativa, case when v_dif < 0 then 'egreso' else 'ingreso' end, 'Diferencia de caja', 'efectivo', abs(v_dif),
+            'Cierre de caja — ' || case when v_dif < 0 then 'faltante' else 'sobrante' end || ' al contar el efectivo', auth.uid(), 'cierre_turno', p_turno);
+  end if;
 
   update turnos_caja set estado = 'cerrado', efectivo_contado_centavos = p_efectivo_contado,
          efectivo_esperado_centavos = v_esp, cerrado_en = now(), cerrado_por = auth.uid(),
@@ -793,3 +804,19 @@ begin
 end;
 $$;
 grant execute on function reabrir_turno(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Una sola vez (idempotente): turnos que ya se cerraron con diferencia de caja
+-- antes de que el cierre la volcara al Flujo de caja.
+-- ---------------------------------------------------------------------------
+insert into movimientos_caja (empresa_id, fecha, tipo, categoria, medio, monto_centavos, nota, creado_por, origen, turno_id)
+select t.empresa_id, t.fecha_operativa,
+       case when d.dif < 0 then 'egreso' else 'ingreso' end, 'Diferencia de caja', 'efectivo', abs(d.dif),
+       'Cierre de caja — ' || case when d.dif < 0 then 'faltante' else 'sobrante' end || ' al contar el efectivo',
+       t.cerrado_por, 'cierre_turno', t.id
+  from turnos_caja t
+  cross join lateral (select t.efectivo_contado_centavos - t.efectivo_esperado_centavos as dif) d
+ where t.estado = 'cerrado' and t.efectivo_contado_centavos is not null and t.efectivo_esperado_centavos is not null
+   and d.dif <> 0
+   and not exists (select 1 from movimientos_caja m where m.turno_id = t.id and m.origen = 'cierre_turno'
+                      and m.categoria = 'Diferencia de caja' and m.activo);
