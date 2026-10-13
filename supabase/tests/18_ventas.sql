@@ -260,10 +260,14 @@ select t_ok((crear_pedido(:'turno', '{}', '[{"receta_id":"f1000000-0000-0000-000
 
 -- ---- Flujo de caja ----
 select t_login('gerA');
-select t_igual((select count(*)::int from movimientos_caja where origen = 'cierre_turno' and activo), 2, 'el cierre generó un ingreso por medio');
-select t_igual((select monto_centavos from movimientos_caja where origen = 'cierre_turno' and medio = 'efectivo'), 28000::bigint, 'ingreso Ventas efectivo');
+select t_igual((select count(*)::int from movimientos_caja where origen = 'cierre_turno' and activo and categoria = 'Ventas'), 2, 'el cierre generó un ingreso por medio');
+select t_ok((select tipo = 'egreso' and medio = 'efectivo' and monto_centavos = 300 and fecha = (select fecha_operativa from turnos_caja where id = :'turno')
+                    and nota like '%faltante%' from movimientos_caja where origen = 'cierre_turno' and categoria = 'Diferencia de caja' and activo),
+  'el faltante de caja (300) pasó al Flujo como egreso de efectivo');
+select t_igual((select count(*)::int from movimientos_caja where origen = 'cierre_turno' and activo and categoria = 'Diferencia de caja'), 1, 'una sola línea de diferencia');
+select t_igual((select monto_centavos from movimientos_caja where origen = 'cierre_turno' and medio = 'efectivo' and categoria = 'Ventas'), 28000::bigint, 'ingreso Ventas efectivo');
 select t_igual((select monto_centavos from movimientos_caja where origen = 'cierre_turno' and medio = 'transferencia'), 11000::bigint, 'ingreso Ventas transferencia');
-select t_ok((select bool_and(tipo = 'ingreso' and categoria = 'Ventas' and nota like 'Cierre de caja — 3 pedidos') from movimientos_caja where origen = 'cierre_turno'),
+select t_ok((select bool_and(tipo = 'ingreso' and nota like 'Cierre de caja — 3 pedidos') from movimientos_caja where origen = 'cierre_turno' and categoria = 'Ventas'),
   'categoría Ventas y nota del cierre');
 select t_ok((select tipo = 'egreso' and medio = 'efectivo' and monto_centavos = 1200 and categoria = 'Hielo' from movimientos_caja where origen = 'turno'), 'la salida de efectivo está como egreso');
 select t_ok((select bool_and(fecha = (select fecha_operativa from turnos_caja where id = :'turno')) from movimientos_caja where turno_id = :'turno'),
@@ -294,12 +298,12 @@ select cerrar_turno(:'turno2', 0, null);
 select reabrir_turno(:'turno', 'corregir un cobro');
 select t_ok((select estado = 'abierto' and efectivo_contado_centavos is null and efectivo_esperado_centavos is null from turnos_caja where id = :'turno'), 'el turno vuelve a abierto');
 select t_igual((select count(*)::int from movimientos_caja where origen = 'cierre_turno' and turno_id = :'turno' and activo), 0, 'los ingresos del cierre quedan de baja');
-select t_igual((select count(*)::int from movimientos_caja where origen = 'cierre_turno' and turno_id = :'turno'), 2, 'sin borrarse');
+select t_igual((select count(*)::int from movimientos_caja where origen = 'cierre_turno' and turno_id = :'turno'), 3, 'sin borrarse (2 de ventas y la diferencia de caja)');
 select t_igual((select count(*)::int from movimientos_caja where origen = 'turno' and turno_id = :'turno' and activo), 1, 'la salida de efectivo sigue vigente');
 select t_ok((select count(*) from auditoria where accion = 'reabrir_turno' and entidad_id = :'turno') = 1, 'la reapertura queda auditada');
 select anular_pedido(:'p3', 'cobro mal cargado');
 select cerrar_turno(:'turno', 31800, null);
-select t_igual((select count(*)::int from movimientos_caja where origen = 'cierre_turno' and turno_id = :'turno' and activo), 2, 'al recerrar hay un ingreso vigente por medio (sin duplicar)');
+select t_igual((select count(*)::int from movimientos_caja where origen = 'cierre_turno' and turno_id = :'turno' and activo), 2, 'al recerrar hay un ingreso vigente por medio (sin duplicar) y sin diferencia (caja justa)');
 select t_igual((select sum(monto_centavos)::bigint from movimientos_caja where origen = 'cierre_turno' and turno_id = :'turno' and activo), 34000::bigint,
   'y refleja el pedido anulado en la reapertura (39.000 − 5.000)');
 select t_ok((resumen_turno(:'turno') ->> 'diferencia_centavos') = '0' and (resumen_turno(:'turno') ->> 'efectivo_esperado_centavos') = '31800',
@@ -322,5 +326,15 @@ select t_ok(not exists (
   select 1 from pedidos p where p.estado <> 'anulado'
    and p.total_centavos <> (select coalesce(sum(monto_centavos), 0) from pedido_pagos where pedido_id = p.id)),
   'invariante: Σ pagos = total en todo pedido no anulado');
+
+-- Un turno cerrado ANTES de que el cierre volcara la diferencia: el script la agrega una sola vez.
+insert into turnos_caja (id, empresa_id, fecha_operativa, estado, fondo_inicial_centavos, efectivo_contado_centavos, efectivo_esperado_centavos, cerrado_en)
+values ('b1000000-0000-0000-0000-000000000009', '11111111-1111-1111-1111-111111111111', date '2026-01-05', 'cerrado', 0, 8000, 10000, now());
+\ir ../f2_ventas_rpc.sql
+\ir ../f2_ventas_rpc.sql
+select t_igual((select count(*)::int from movimientos_caja where turno_id = 'b1000000-0000-0000-0000-000000000009' and categoria = 'Diferencia de caja'), 1,
+  'la diferencia de un turno ya cerrado se agrega una sola vez (aunque se re-ejecute)');
+select t_ok((select tipo = 'egreso' and monto_centavos = 2000 and fecha = date '2026-01-05' from movimientos_caja where turno_id = 'b1000000-0000-0000-0000-000000000009'),
+  'faltante de $20 del turno ya cerrado, en su día operativo');
 
 rollback;
