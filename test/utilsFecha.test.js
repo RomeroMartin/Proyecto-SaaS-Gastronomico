@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  fechaOperativa,
   diasCorridos,
   antiguedadAnios,
   antiguedadTexto,
@@ -97,4 +98,17 @@ test("diasEntre: signo y datos faltantes", () => {
   assert.equal(diasEntre("2026-10-13", "2026-10-20"), 7);
   assert.equal(diasEntre("2026-10-20", "2026-10-13"), -7);
   assert.equal(diasEntre("2026-10-13", ""), null);
+});
+
+test("fechaOperativa: mismos casos que fecha_operativa() de SQL", () => {
+  const BA = "America/Argentina/Buenos_Aires";
+  const op = (iso, zona = BA, corte = "06:00") => fechaOperativa(new Date(iso), zona, corte);
+  assert.equal(op("2026-03-10T19:30:00-03:00"), "2026-03-10"); // 19:30 → mismo día
+  assert.equal(op("2026-03-11T00:40:00-03:00"), "2026-03-10"); // 00:40 → día anterior
+  assert.equal(op("2026-03-11T05:59:00-03:00"), "2026-03-10"); // 05:59 → día anterior
+  assert.equal(op("2026-03-11T06:00:00-03:00"), "2026-03-11"); // 06:00 → mismo día
+  assert.equal(op("2026-03-01T01:00:00-03:00"), "2026-02-28"); // cambio de mes
+  assert.equal(op("2027-01-01T02:00:00-03:00"), "2026-12-31"); // cambio de año
+  assert.equal(op("2026-03-11T02:30:00-03:00", BA, "03:00"), "2026-03-10"); // corte configurable
+  assert.equal(op("2026-03-11T02:30:00Z", "America/Mexico_City"), "2026-03-10"); // otra zona
 });

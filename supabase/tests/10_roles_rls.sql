@@ -56,7 +56,7 @@ begin
       escribe  := roles[i][2] = any (m.escritura::text[]);
       execute format('select count(*) from %I', m.tabla) into n;
       perform t_ok((n > 0) = lee, format('%s %s lee %s', roles[i][2], case when lee then 'puede' else 'NO puede' end, m.tabla));
-      execute format('update %I set empresa_id = empresa_id', m.tabla);
+      execute format('update %I set %s', m.tabla, case when m.tabla = 'movimientos_caja' then 'nota = nota' else 'empresa_id = empresa_id' end);
       get diagnostics n = row_count;
       perform t_ok((n > 0) = escribe, format('%s %s escribir %s', roles[i][2], case when escribe then 'puede' else 'NO puede' end, m.tabla));
     end loop;
@@ -67,7 +67,7 @@ begin
     perform t_login('admB');
     execute format('select count(*) from %I where empresa_id = %L', m.tabla, '11111111-1111-1111-1111-111111111111') into n;
     perform t_ok(n = 0, format('otra empresa no ve filas de %s', m.tabla));
-    execute format('update %I set empresa_id = empresa_id where empresa_id = %L', m.tabla, '11111111-1111-1111-1111-111111111111');
+    execute format('update %I set %s where empresa_id = %L', m.tabla, case when m.tabla = 'movimientos_caja' then 'nota = nota' else 'empresa_id = empresa_id' end, '11111111-1111-1111-1111-111111111111');
     get diagnostics n = row_count;
     perform t_ok(n = 0, format('otra empresa no puede modificar %s', m.tabla));
   end loop;
