@@ -12,6 +12,7 @@ import * as recetasRepo from "../data/recetasRepo.js";
 import { ALICUOTAS_IVA, desglosarFactura } from "../../core/fiscal.js";
 import { UNIDADES_POR_MAGNITUD, convertirAUnidadBase, factorAUnidadBase, costoNetoPorUnidadBase } from "../../core/unidades.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
+import { hoyISO } from "../../core/utilsFecha.js";
 import { escapar, setMsg, labelInfo, iconoInfo, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
 import { verFactura, editarFactura, validarFechas, FECHA_MIN, FECHA_MAX } from "./facturaModal.js";
 
@@ -25,7 +26,7 @@ let provMap = {};
 const UNIDAD_PRESENTACION = "__presentacion__";
 let ladoEditado = "total"; // "neto" | "total"
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyISO();
 const $ = (c, s) => c.querySelector(s);
 
 const fmtFecha = (iso) => (iso ? String(iso).slice(0, 10).split("-").reverse().join("/") : "—");

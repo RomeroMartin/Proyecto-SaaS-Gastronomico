@@ -292,7 +292,7 @@ function modalSueldo() {
 // ---------- Ausencias ----------
 async function tabAusencias(body) {
   body.innerHTML = "<p class='muted'>Cargando ausencias…</p>";
-  const anio = new Date().getFullYear();
+  const anio = Number(hoyISO().slice(0, 4));
   let lista, saldo;
   try {
     [lista, saldo] = await Promise.all([
