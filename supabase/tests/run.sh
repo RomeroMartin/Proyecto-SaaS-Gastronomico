@@ -49,6 +49,10 @@ echo "▶ Helpers y datos base"
 sql "$DIR/tests/01_helpers.sql"
 sql "$DIR/tests/02_datos_base.sql"
 
+echo "▶ Datos generados para los tests (casos de costeo compartidos con Node)"
+mkdir -p "$DIR/tests/.gen"
+node "$DIR/tests/gen_costeo_fixture.mjs" > "$DIR/tests/.gen/costeo_fixture.sql"
+
 echo "▶ Tests"
 fallos=0
 for t in "$DIR"/tests/[1-9]*.sql; do
