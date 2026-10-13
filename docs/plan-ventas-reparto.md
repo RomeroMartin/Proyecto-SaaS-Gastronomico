@@ -617,7 +617,8 @@ Validar estas dependencias con un `check` o un trigger (mensaje claro).
 
 ## Fase 2 — Ventas (mostrador)
 
-> **Estado:** entrega 1/2 hecha (base de datos + lógica pura + tests):
+> **Estado:** ✅ entrega 1/2 (base de datos + lógica pura + tests) y entrega 2/2 (pantallas: Mostrador, Historial, Configuración, campos de venta en recetas, impresión con respaldo WhatsApp) hechas.
+> Entrega 1/2:
 > `f2_ventas.sql`, `f2_caja_ventas.sql`, `f2_ventas_rpc.sql` (o `f2_aplicar_todo.sql`),
 > `js/core/ventas.js`. Falta la entrega 2/2: pantallas (Mostrador, Historial,
 > Configuración, campos de venta en recetas) y el ajuste del Flujo de caja.

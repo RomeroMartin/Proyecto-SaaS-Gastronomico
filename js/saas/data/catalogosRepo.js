@@ -14,6 +14,7 @@ export const DEFAULTS = {
   rubro: RUBROS,
   sector: ["Cocina", "Parrilla", "Barra", "Fríos", "Pastelería", "Cafetería"],
   unidad_rendimiento: ["un", "porción", "ml", "l", "g", "kg", "docena"],
+  cat_venta: [],
   cat_ingreso: ["Ventas", "Ventas tarjeta", "Ventas QR", "Otros ingresos"],
   cat_egreso: ["Pago a proveedor", "Sueldos", "Servicios", "Mantenimiento", "Impuestos", "Retiro", "Otros gastos"],
 };
@@ -23,6 +24,7 @@ export const TIPOS_CATALOGO = {
   rubro: "Rubros",
   sector: "Sectores",
   unidad_rendimiento: "Unidades de rendimiento",
+  cat_venta: "Categorías de venta (mostrador)",
   cat_ingreso: "Categorías de ingreso (caja)",
   cat_egreso: "Categorías de egreso (caja)",
 };

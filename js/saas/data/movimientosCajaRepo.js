@@ -9,6 +9,7 @@ export async function listarRango(desde, hasta) {
   const { data, error } = await supabase
     .from("movimientos_caja")
     .select("*")
+    .eq("activo", true)
     .gte("fecha", desde)
     .lte("fecha", hasta)
     .order("fecha", { ascending: false })
@@ -36,7 +37,7 @@ export async function crear(empresaId, datos) {
   return data;
 }
 
-/** Elimina un movimiento. */
+/** Elimina un movimiento: en la base es una baja lógica auditada (los del cierre de caja no se pueden borrar). */
 export async function eliminar(id) {
   const { error } = await supabase.from("movimientos_caja").delete().eq("id", id);
   if (error) throw error;

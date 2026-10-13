@@ -187,6 +187,57 @@
       #app.sidebar-abierta #overlay { display: block; }
     }
 
+
+    /* ---------- Modo caja (Ventas → Mostrador): pantalla completa, menú colapsado, táctil ---------- */
+    body.modo-caja .topbar-mobile { display: flex; }
+    body.modo-caja .sidebar { position: fixed; left: 0; top: 0; z-index: 30; transform: translateX(-100%); transition: transform .2s ease; }
+    body.modo-caja #app.sidebar-abierta .sidebar { transform: translateX(0); }
+    body.modo-caja #app.sidebar-abierta #overlay { display: block; }
+    body.modo-caja .main-inner { max-width: none; padding: 12px 14px 24px; }
+    .mostrador { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; align-items: start; }
+    @media (max-width: 960px) { .mostrador { grid-template-columns: 1fr; } }
+    .m-estado { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .m-estado .acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+    .m-offline { background: #b91c1c; color: #fff; padding: 12px 16px; border-radius: 10px; font-weight: 650; margin-bottom: 12px; }
+    .m-cat { margin: 14px 0 6px; font-size: 12.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+    .m-botones { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .m-prod { min-height: 72px; background: #fff; color: var(--tinta); border: 1px solid var(--borde); border-radius: 10px;
+      padding: 10px 12px; text-align: left; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; position: relative; }
+    .m-prod:hover { background: var(--hover); }
+    .m-prod:active { background: var(--activo); }
+    .m-prod b { font-size: 15px; line-height: 1.25; font-weight: 650; }
+    .m-prod .precio { color: var(--muted); font-size: 13.5px; }
+    .m-prod .cant { position: absolute; top: 6px; right: 8px; background: var(--tinta); color: #fff; border-radius: 999px; min-width: 24px; height: 24px;
+      display: grid; place-items: center; font-size: 13px; font-weight: 700; padding: 0 6px; }
+    .m-ticket { position: sticky; top: 56px; }
+    .m-linea { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--borde-2); }
+    .m-linea.sel { background: #f4f4f5; margin: 0 -8px; padding: 8px; border-radius: 8px; }
+    .m-linea .ad { grid-column: 1 / -1; color: var(--muted); font-size: 13px; padding-left: 12px; display: flex; justify-content: space-between; }
+    .m-step { display: inline-flex; align-items: center; gap: 4px; }
+    .m-step button { width: 44px; height: 44px; padding: 0; font-size: 20px; line-height: 1; background: #fff; color: var(--tinta); border: 1px solid var(--borde); }
+    .m-step span { min-width: 26px; text-align: center; font-weight: 650; }
+    .m-total { font-size: 34px; font-weight: 750; letter-spacing: -.02em; text-align: right; margin: 6px 0 10px; }
+    .m-medios { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+    .m-medios button, .m-adic button, .m-confirmar { min-height: 48px; }
+    .m-medios button[aria-pressed="true"] { background: var(--tinta); color: #fff; }
+    .m-medios button[aria-pressed="false"] { background: #fff; color: var(--tinta); border-color: var(--borde); }
+    .m-adic { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    .m-adic button { background: #fff; color: var(--tinta); border: 1px dashed #a1a1aa; }
+    .m-confirmar { width: 100%; font-size: 17px; margin-top: 12px; }
+    .m-alias { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+    .m-alias b { font-size: 18px; word-break: break-all; }
+    .m-pedido { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--borde-2); }
+    .m-pedido[data-anulado="1"] { opacity: .5; text-decoration: line-through; }
+    .m-num { font-weight: 750; font-size: 17px; min-width: 52px; }
+    .m-pedido .btns { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+    .m-pedido .btns button { min-height: 40px; }
+    .m-ok { text-align: center; }
+    .m-ok .num-grande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; }
+
+    /* ---------- Ticket de comanda (impresión) ---------- */
+    #zona-impresion { display: none; }
+    #zona-impresion pre { margin: 0; font: 12px/1.25 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+
     /* ---------- RRHH ---------- */
     .rrhh-badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
       border: 1px solid var(--borde); background: var(--hover); color: var(--tinta-2); }
@@ -221,6 +272,9 @@
       .contenido, .main-inner { max-width: none; margin: 0; padding: 0; }
       .card { border: 0; padding: 6px 0; margin: 0; break-inside: avoid; }
       body { background: #fff; }
+      /* Ticket de comanda: se imprime SOLO la zona de impresión (hoja angosta de la térmica). */
+      body.imprimiendo-ticket #app, body.imprimiendo-ticket #login, body.imprimiendo-ticket .modal-ov { display: none !important; }
+      body.imprimiendo-ticket #zona-impresion { display: block !important; }
     }
   </style>
 </head>
@@ -281,6 +335,9 @@
 
     </div>
   </section>
+
+  <!-- Zona de impresión de comandas (solo visible al imprimir un ticket) -->
+  <div id="zona-impresion" aria-hidden="true"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script type="module" src="./js/saas/ui/app.js"></script>

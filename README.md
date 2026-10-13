@@ -95,7 +95,7 @@ En resumen:
 > **Fase 2 (Ventas de mostrador) — base de datos** — después de la Fase 1, ejecutar
 > UNA vez `supabase/f2_aplicar_todo.sql` (idempotente). No cambia nada de lo que ya
 > usás: agrega tablas y funciones nuevas, y hace que "borrar" un movimiento del
-> Flujo de caja sea una baja lógica. Las pantallas llegan en la siguiente entrega.
+> Flujo de caja sea una baja lógica. Las pantallas (Mostrador, Historial, Configuración) están en la entrega 2/2: no requieren más SQL.
 > El módulo `ventas` se activa por empresa (ver Fase 1).
 
 > **¿Ya tenías el proyecto corriendo antes de esta versión?** Además de lo de

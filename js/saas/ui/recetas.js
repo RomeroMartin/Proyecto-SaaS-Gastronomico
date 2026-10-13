@@ -11,9 +11,12 @@ import * as catalogos from "../data/catalogosRepo.js";
 import { UNIDADES_POR_MAGNITUD, factorAUnidadBase } from "../../core/unidades.js";
 import { costoReceta, validarGrafoReceta, rentabilidad, precioSugerido } from "../../core/costeo.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
+import * as ventasRepo from "../data/ventasRepo.js";
+import { moduloActivo } from "../../core/modulos.js";
 import { escapar, setMsg, labelInfo, datalist, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
 
 let PERFIL = null;
+const ventasActivo = () => moduloActivo(PERFIL && PERFIL.empresa && PERFIL.empresa.modulos, "ventas");
 let INSUMOS = [];
 let RECETAS = [];
 let insumoPorId = {};
@@ -162,7 +165,7 @@ function dibujarTabla(container) {
 
 function tablaPlatos(items) {
   const filas = items.map(({ r, costo, rent }) => `<tr>
-      <td>${escapar(r.nombre)}${r.sector_venta ? `<div class="muted" style="font-size:11px;">${escapar(r.sector_venta)}</div>` : ""}</td>
+      <td>${escapar(r.nombre)}${r.sector_venta ? `<div class="muted" style="font-size:11px;">${escapar(r.sector_venta)}</div>` : ""}${r.vende_en_mostrador ? ` <span class="rrhh-pill">En mostrador${r.es_adicional ? " · adicional" : ""}</span>` : ""}</td>
       <td class="num">${costo == null ? "—" : formatearCentavos(costo)}</td>
       <td class="num">${formatearCentavos(r.precio_venta_publico_centavos || 0)}</td>
       <td class="num">${rent ? escapar(formatearPorcentaje(rent.foodCostPct)) : "—"}</td>
@@ -265,6 +268,21 @@ function renderEditor(cont, container, receta) {
         <div>${labelInfo("rec-sector", "Sector", "Dónde se prepara/despacha (Cocina, Parrilla, Barra…). Elegí o escribí uno nuevo.")}
           <input id="rec-sector" list="dl-sector" value="${escapar(r.sector_venta || "")}" placeholder="Elegí o escribí…" /></div>
       </div>
+      ${ventasActivo() ? `
+      <div id="rec-venta" class="card" style="background:#fafafa;margin-top:12px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <input type="checkbox" id="rec-vende" style="width:auto;" ${r.vende_en_mostrador ? "checked" : ""} /> Se vende en el mostrador</label>
+        <div id="rec-venta-det" class="fila" style="margin-top:8px;">
+          <div>${labelInfo("rec-catv", "Categoría de venta", "Agrupa los botones del mostrador (Burgers, Bebidas…). Elegí o escribí una nueva.")}
+            <input id="rec-catv" list="dl-catv" value="${escapar(r.categoria_venta || "")}" placeholder="Elegí o escribí…" /></div>
+          <div>${labelInfo("rec-ordv", "Orden", "Posición dentro de su categoría (menor primero).")}
+            <input id="rec-ordv" type="number" value="${r.orden_venta || 0}" /></div>
+          <div style="flex:1.4;"><label style="display:flex;align-items:center;gap:8px;margin-top:22px;">
+            <input type="checkbox" id="rec-adic" style="width:auto;" ${r.es_adicional ? "checked" : ""} />
+            Es un adicional (se suma a otro producto)</label></div>
+        </div>
+        ${datalist("dl-catv", catalogos.opciones("cat_venta"))}
+      </div>` : ""}
       ${datalist("dl-unidad-rend", catalogos.opciones("unidad_rendimiento"))}
       ${datalist("dl-sector", catalogos.opciones("sector"))}
 
@@ -302,6 +320,8 @@ function renderEditor(cont, container, receta) {
 function toggleSoloPlato(cont) {
   const esPlato = cont.querySelector("#rec-tipo").value === "plato";
   cont.querySelector("#rec-solo-plato").style.display = esPlato ? "" : "none";
+  const v = cont.querySelector("#rec-venta");
+  if (v) v.style.display = esPlato ? "" : "none";
 }
 
 function opcionesRef(tipo) {
@@ -477,14 +497,25 @@ async function guardar(container) {
   try {
     await catalogos.asegurar(PERFIL.empresa_id, "unidad_rendimiento", datos.rendimiento_unidad);
     if (receta.tipo === "plato") await catalogos.asegurar(PERFIL.empresa_id, "sector", datos.sector_venta);
+    let idGuardada = ed.id;
     if (ed.id) {
       await recetasRepo.actualizar(PERFIL.empresa_id, ed.id, datos, ingredientes, costo || 0);
     } else {
-      await recetasRepo.crear(PERFIL.empresa_id, datos, ingredientes, costo || 0);
+      idGuardada = await recetasRepo.crear(PERFIL.empresa_id, datos, ingredientes, costo || 0);
+    }
+    // Venta en mostrador (solo platos, si la empresa tiene el módulo ventas).
+    let avisoVenta = "";
+    if (receta.tipo === "plato" && ventasActivo() && cont.querySelector("#rec-vende")) {
+      const vende = cont.querySelector("#rec-vende").checked;
+      const cat = val(cont, "#rec-catv");
+      try {
+        await ventasRepo.configurarVentaReceta(idGuardada, vende, cat, val(cont, "#rec-ordv"), cont.querySelector("#rec-adic").checked);
+        if (vende && cat) await catalogos.asegurar(PERFIL.empresa_id, "cat_venta", cat);
+      } catch (err) { avisoVenta = " (pero no se pudo dejar a la venta: " + (err.message || err) + ")"; }
     }
     ed = nuevoEditor();
     cerrarModal();
-    toast(receta.tipo === "plato" ? "Plato guardado ✔" : "Preparación guardada ✔");
+    toast((receta.tipo === "plato" ? "Plato guardado ✔" : "Preparación guardada ✔") + avisoVenta, avisoVenta ? "info" : "ok", avisoVenta ? 6500 : 3200);
     await cargar(container);
   } catch (err) {
     setMsg(msg, "No se pudo guardar: " + (err.message || err), "error");

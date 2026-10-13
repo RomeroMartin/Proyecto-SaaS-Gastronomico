@@ -23,6 +23,9 @@ import * as recetas from "./recetas.js";
 import * as carta from "./carta.js";
 import * as rentabilidad from "./rentabilidad.js";
 import * as config from "./config.js";
+import * as ventasMostrador from "./ventasMostrador.js";
+import * as ventasHistorial from "./ventasHistorial.js";
+import * as ventasConfig from "./ventasConfig.js";
 import * as rrhhEmpleados from "./rrhhEmpleados.js";
 import * as rrhhVencimientos from "./rrhhVencimientos.js";
 import * as rrhhConfig from "./rrhhConfig.js";
@@ -41,13 +44,14 @@ const ICONOS = {
   carta: svg('<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>'),
   rrhh: svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
   config: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
+  ventas: svg('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'),
   chevron: svg('<polyline points="9 18 15 12 9 6"/>'),
 };
 
 // Registro del menú: módulos → submódulos. El primer submódulo suele ser el Resumen.
 const MENU = [
   {
-    id: "admin", titulo: "Administrativo", icono: ICONOS.admin,
+    id: "admin", titulo: "Administrativo", icono: ICONOS.admin, roles: ["ADMIN", "GERENTE", "COCINA", "AUDITOR"],
     items: [
       { clave: "admin_resumen", titulo: "Resumen", montar: resumenes.admin },
       { clave: "proveedores", titulo: "Proveedores", montar: proveedores.montar },
@@ -58,7 +62,7 @@ const MENU = [
     ],
   },
   {
-    id: "costos", titulo: "Costos", icono: ICONOS.costos,
+    id: "costos", titulo: "Costos", icono: ICONOS.costos, roles: ["ADMIN", "GERENTE", "COCINA", "AUDITOR"],
     items: [
       { clave: "costos_resumen", titulo: "Resumen", montar: resumenes.costos },
       { clave: "insumos", titulo: "Insumos", montar: insumos.montar },
@@ -66,12 +70,20 @@ const MENU = [
     ],
   },
   {
-    id: "carta", titulo: "Rentabilidad de carta", icono: ICONOS.carta,
+    id: "carta", titulo: "Rentabilidad de carta", icono: ICONOS.carta, roles: ["ADMIN", "GERENTE", "COCINA", "AUDITOR"],
     items: [
       { clave: "carta_resumen", titulo: "Resumen", montar: resumenes.carta },
       { clave: "recetas", titulo: "Platos y preparaciones", montar: recetas.montar },
       { clave: "carta", titulo: "Carta", montar: carta.montar },
       { clave: "rentabilidad", titulo: "Rentabilidad de carta", montar: rentabilidad.montar },
+    ],
+  },
+  {
+    id: "ventas", titulo: "Ventas", icono: ICONOS.ventas, roles: ["ADMIN", "GERENTE", "AUDITOR", "CAJERO"],
+    items: [
+      { clave: "ventas_mostrador", titulo: "Mostrador", montar: ventasMostrador.montar, roles: ["ADMIN", "GERENTE", "CAJERO"] },
+      { clave: "ventas_historial", titulo: "Historial de turnos", montar: ventasHistorial.montar, roles: ["ADMIN", "GERENTE", "AUDITOR"] },
+      { clave: "ventas_config", titulo: "Configuración", montar: ventasConfig.montar, roles: ["ADMIN"] },
     ],
   },
   {
@@ -83,7 +95,7 @@ const MENU = [
     ],
   },
   {
-    id: "config", titulo: "Configuración", icono: ICONOS.config,
+    id: "config", titulo: "Configuración", icono: ICONOS.config, roles: ["ADMIN", "GERENTE", "COCINA", "AUDITOR"],
     items: [
       { clave: "cfg_empresa", titulo: "Empresa", montar: config.empresa },
       { clave: "cfg_usuarios", titulo: "Usuarios y roles", montar: config.usuarios },
@@ -135,6 +147,7 @@ async function manejarLogin(e) {
 async function manejarLogout() {
   await logout();
   perfil = null;
+  document.body.classList.remove("modo-caja");
   mostrar($("#app"), false);
   mostrar($("#login"), true);
 }
@@ -245,6 +258,7 @@ async function irA(clave) {
 
   const cont = $("#screen");
   cont.innerHTML = "<p class='muted'>Cargando…</p>";
+  document.body.classList.remove("modo-caja"); // el Mostrador lo vuelve a activar (pantalla completa, táctil)
   try {
     await item.montar(cont, perfil);
   } catch (err) {
