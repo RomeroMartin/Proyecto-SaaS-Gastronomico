@@ -47,3 +47,11 @@ test("htmlTicket: @page con medidas explícitas (sin 'auto'), sin márgenes y co
   assert.doesNotMatch(html, /size:[^;]*auto/);
   assert.match(html, /a &lt;b&gt; &amp; c/);
 });
+
+test("espacio en blanco al final: configurable, acotado y presente en el alto y en el HTML", () => {
+  assert.equal(medidasTicket(texto, 80, 500).colaMm, 80);   // tope
+  assert.equal(medidasTicket(texto, 80, -5).colaMm, 0);
+  assert.match(htmlTicket(texto, 80, "driver", 25), /padding: 3mm 4mm 25mm/);
+  const largo = Array.from({ length: 40 }, (_, i) => "l" + i).join("\n");
+  assert.equal(medidasTicket(largo, 80, 30).altoMm - medidasTicket(largo, 80, 0).altoMm, 30);
+});

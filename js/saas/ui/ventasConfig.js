@@ -8,7 +8,7 @@
 
 import * as ventasRepo from "../data/ventasRepo.js";
 import { MEDIOS_PAGO, NOMBRE_MEDIO, PLANTILLA_COMANDA, textoComanda, textoTicket } from "../../core/ventas.js";
-import { imprimirTicket, MODOS_PAPEL, getModoPapel, setModoPapel } from "./impresion.js";
+import { imprimirTicket, MODOS_PAPEL, getModoPapel, setModoPapel, getColaMm, setColaMm } from "./impresion.js";
 import { pesosACentavos } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo } from "./helpers.js";
 
@@ -54,6 +54,9 @@ export async function montar(container, perfil) {
           (en las preferencias del driver, papel de rollo de 58 u 80 mm). Para que imprima sin mostrar el diálogo, abrí Chrome con <code>--kiosk-printing</code>.</p>
         <div class="fila"><div>${labelInfo("vc-papel", "Papel de la impresora (solo este equipo)", "Cada impresora se comporta distinto. Probá con 'Ajustado'. Si sale girado, en una tira larga o cortado, probá 'Usar el papel del driver' (el driver tiene que tener el rollo de 58/80 mm). Se guarda en este equipo.")}
           <select id="vc-papel">${Object.entries(MODOS_PAPEL).map(([v, l]) => `<option value="${v}" ${getModoPapel() === v ? "selected" : ""}>${escapar(l)}</option>`).join("")}</select></div></div>
+        <div class="fila"><div>${labelInfo("vc-cola", "Espacio en blanco al final (mm, solo este equipo)", "Papel que avanza después del último renglón. Si tu impresora tiene corte automático, sirve para que la cuchilla corte debajo del texto y no encima. Probá con 20 y subí o bajá de a 5.")}
+          <input id="vc-cola" type="number" min="0" max="80" step="1" value="${getColaMm()}" /></div></div>
+        <p class="muted" style="font-size:12.5px;">El corte lo hace la impresora, no la página: en <b>Preferencias de la impresora (Windows)</b> activá el <b>corte automático al final del documento o de la página</b>.</p>
         <button type="button" id="vc-prueba" class="secundario" style="margin-top:8px;">Imprimir ticket de prueba</button>
         <span id="vc-prueba-msg" class="muted" style="font-size:12.5px;margin-left:8px;"></span>
         <div>${labelInfo("vc-plantilla", "Texto de la comanda (opcional)", "Dejalo vacío para usar el formato estándar. Marcas: {negocio} {numero} {fecha} {hora} {cliente} {telefono} {modalidad} {direccion} {items} {nota} {total} {pago}. Si una línea queda vacía se omite.")}
@@ -88,6 +91,7 @@ export async function montar(container, perfil) {
   });
 
   $(container, "#vc-papel").addEventListener("change", (e) => setModoPapel(e.target.value));
+  $(container, "#vc-cola").addEventListener("change", (e) => { setColaMm(e.target.value); e.target.value = getColaMm(); });
   $(container, "#vc-prueba").addEventListener("click", async () => {
     const msg = $(container, "#vc-prueba-msg");
     const ancho = Number($(container, "#vc-ancho").value) || 80;
@@ -99,7 +103,7 @@ export async function montar(container, perfil) {
       pagos: [{ medio: "efectivo", monto_centavos: 2350000 }],
     };
     msg.textContent = "Enviando a la impresora…";
-    const r = await imprimirTicket(textoTicket(ej, { negocio: c.negocio, plantilla: $(container, "#vc-plantilla").value, zona: c.zona_horaria, anchoMm: ancho }), ancho, $(container, "#vc-papel").value);
+    const r = await imprimirTicket(textoTicket(ej, { negocio: c.negocio, plantilla: $(container, "#vc-plantilla").value, zona: c.zona_horaria, anchoMm: ancho }), ancho, $(container, "#vc-papel").value, Number($(container, "#vc-cola").value));
     msg.textContent = r.ok ? "Enviado. Revisá que salga completo y del largo justo." : "No se pudo imprimir: " + r.error;
   });
 

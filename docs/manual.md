@@ -238,7 +238,8 @@ Instalá la térmica como impresora del equipo (cualquier modelo de 58 u 80 mm).
    driver de la impresora, el papel debe ser el **rollo de 58 u 80 mm** (no A4).
 3. El ticket se arma con el ancho y el largo justos del contenido; si sale una tira larga o en blanco, revisá el
    tamaño de papel del driver.
-4. Para que imprima **sin mostrar el diálogo**, abrí Chrome con `--kiosk-printing` (acceso directo →
+4. **Corte automático:** el corte lo hace la impresora. En las preferencias del driver activá "cortar al final del documento/página" y, en Configuración, ajustá el **espacio en blanco al final** (por defecto 20 mm) para que la cuchilla corte debajo del texto.
+5. Para que imprima **sin mostrar el diálogo**, abrí Chrome con `--kiosk-printing` (acceso directo →
    Propiedades → Destino: agregar `--kiosk-printing`).
 
 ## 6. Configuración
