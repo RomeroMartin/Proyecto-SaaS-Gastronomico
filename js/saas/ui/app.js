@@ -9,6 +9,7 @@
 import { login, logout, sesionActual, miPerfil } from "../auth.js";
 import { mostrar, setMsg, escapar } from "./helpers.js";
 import { setZonaHoraria } from "../../core/utilsFecha.js";
+import { moduloActivo } from "../../core/modulos.js";
 import * as catalogos from "../data/catalogosRepo.js";
 import * as resumenes from "./resumenes.js";
 import * as proveedores from "./proveedores.js";
@@ -96,16 +97,25 @@ const MENU = [
 function permitido(entrada) {
   return !entrada.roles || (perfil && entrada.roles.includes(perfil.rol));
 }
+// ¿La empresa tiene activo el módulo de este grupo? (los ítems heredan del grupo)
+function moduloHabilitado(grupo) {
+  return moduloActivo(perfil && perfil.empresa && perfil.empresa.modulos, grupo.id);
+}
 // Grupos visibles para el rol actual, con sus ítems ya filtrados.
 function menuVisible() {
   return MENU
+    .filter(moduloHabilitado)
     .filter(permitido)
     .map((g) => ({ ...g, items: g.items.filter(permitido) }))
     .filter((g) => g.items.length);
 }
 
 const ITEMS = Object.fromEntries(MENU.flatMap((g) => g.items.map((it) => [it.clave, it])));
-const CLAVE_INICIAL = "admin_resumen";
+// Primera pantalla disponible para este usuario (módulos activos + rol). "config" siempre existe.
+function claveInicial() {
+  const g = menuVisible()[0];
+  return g ? g.items[0].clave : "cfg_empresa";
+}
 const LS_ULTIMA = "saas_ultima_pantalla";
 
 // ---------- login ----------
@@ -160,7 +170,7 @@ async function entrarApp() {
   await catalogos.cargar(); // opciones de los combos (best-effort)
   construirMenu();
 
-  let inicial = CLAVE_INICIAL;
+  let inicial = claveInicial();
   try { const g = localStorage.getItem(LS_ULTIMA); if (g && ITEMS[g] && puedeVerClave(g)) inicial = g; } catch (_e) {}
   await irA(inicial);
 }
@@ -173,7 +183,7 @@ function grupoDe(clave) {
 function puedeVerClave(clave) {
   const g = grupoDe(clave);
   const it = g && g.items.find((i) => i.clave === clave);
-  return !!(g && it && permitido(g) && permitido(it));
+  return !!(g && it && moduloHabilitado(g) && permitido(g) && permitido(it));
 }
 
 function construirMenu() {
@@ -217,7 +227,11 @@ async function irA(clave) {
   const item = ITEMS[clave];
   if (!item) return;
   // El rol no llega a esta pantalla: caé en la inicial (la RLS igual protege).
-  if (!puedeVerClave(clave)) { await irA(CLAVE_INICIAL); return; }
+  if (!puedeVerClave(clave)) {
+    const ini = claveInicial();
+    if (ini !== clave) await irA(ini);
+    return;
+  }
   try { localStorage.setItem(LS_ULTIMA, clave); } catch (_e) {}
 
   // Abrir el grupo del item activo y marcar el item.

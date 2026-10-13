@@ -85,6 +85,13 @@ En resumen:
 > (cada merge publica el sitio en GitHub Pages). Los tests corren solos en CI
 > (`.github/workflows/tests.yml`) o con `npm test` y `bash supabase/tests/run.sh`.
 
+> **Fase 1 (módulos por empresa)** — después de la Fase 0, ejecutar UNA vez
+> `supabase/f1_modulos_empresa.sql`. Las empresas existentes siguen con
+> Administrativo, Costos, Rentabilidad de carta y RRHH. Los módulos los activa
+> el dueño del producto desde el SQL Editor (el cliente no puede):
+> `update empresas set modulos = '{admin,costos,carta,rrhh,ventas}' where nombre = 'Mi cliente';`
+> (ventas requiere carta y admin; reparto requiere admin).
+
 > **¿Ya tenías el proyecto corriendo antes de esta versión?** Además de lo de
 > arriba, corré una vez `supabase/migracion_impuesto_interno.sql` (agrega el
 > campo de impuesto interno / otros impuestos no recuperables a Facturas) y

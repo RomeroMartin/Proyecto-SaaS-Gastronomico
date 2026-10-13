@@ -225,6 +225,10 @@ En *Empresa* se define la **zona horaria** (las fechas "de hoy" se calculan en e
 zona, no en UTC) y la **condición fiscal** (monotributo, responsable inscripto…).
 La pantalla **Auditoría** (solo ADMIN) muestra quién cambió roles, usuarios y datos sensibles.
 
+### 6.2c Módulos de tu plan
+En *Empresa* se ven los **módulos activos** de tu plan (solo lectura). Un módulo
+apagado no aparece en el menú. Para cambiar de plan, contactá a tu proveedor del sistema.
+
 ### 6.3 Catálogos
 Administrás las opciones de los desplegables: **rubros, sectores, unidades de
 rendimiento y categorías de caja** (ingreso/egreso). Podés **agregar** y

@@ -48,7 +48,7 @@ export async function miPerfil() {
 
   const { data: empresa } = await supabase
     .from("empresas")
-    .select("id, nombre, costea_con_iva, zona_horaria, condicion_fiscal")
+    .select("*")
     .eq("id", perfil.empresa_id)
     .maybeSingle();
 
