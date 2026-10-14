@@ -1028,7 +1028,7 @@ Vistas `security_invoker = true`:
 
 ---
 
-## Fase 4 — Tablero de reparto ("apartados")
+## Fase 4 — Tablero de reparto ("apartados")  ✅ implementada
 
 **Objetivo:** que el dueño vea, a medida que entran los cierres, **cuánto de lo
 que entró ya está comprometido** y cuánto le queda de verdad. Es **informativo**:

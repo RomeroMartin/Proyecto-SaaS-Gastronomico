@@ -102,6 +102,10 @@ En resumen:
 > (idempotente; solo agrega vistas y funciones de lectura). Agrega **Rentabilidad de carta → Ventas reales**
 > para empresas con el módulo Ventas.
 
+> **Fase 4 (Reparto de ingresos)** — después de la Fase 3, ejecutar UNA vez `supabase/f4_reparto.sql`
+> (idempotente). Agrega gastos fijos, parámetros del tablero y el cálculo de sueldos desde RRHH (solo agregados).
+> El módulo `reparto` se activa por empresa desde el SQL Editor (solo el dueño del producto) y solo lo ve el ADMIN.
+
 > **¿Ya tenías el proyecto corriendo antes de esta versión?** Además de lo de
 > arriba, corré una vez `supabase/migracion_impuesto_interno.sql` (agrega el
 > campo de impuesto interno / otros impuestos no recuperables a Facturas) y

@@ -39,7 +39,7 @@ ORDEN=(
   migracion_impuesto_interno migracion_anular_factura migracion_razon_social
   migracion_unidad_uso migracion_fecha_alta migracion_editar_factura heartbeat
   f0_roles_rls f0_auditoria f0_usuarios f0_empresas_columnas f0_zona_horaria
-  f0_integridad f0_costeo f0_rpc_atomicas f1_modulos_empresa f2_ventas f2_caja_ventas f2_ventas_rpc f3_ventas_reportes
+  f0_integridad f0_costeo f0_rpc_atomicas f1_modulos_empresa f2_ventas f2_caja_ventas f2_ventas_rpc f3_ventas_reportes f4_reparto
 )
 for s in "${ORDEN[@]}"; do
   if [ -f "$DIR/$s.sql" ]; then echo "   · $s.sql"; sql "$DIR/$s.sql"; fi
@@ -67,7 +67,7 @@ for t in "$DIR"/tests/[1-9]*.sql; do
 done
 
 echo "▶ Idempotencia: re-ejecutar f0_* sobre la base ya migrada"
-for s in f0_roles_rls f0_auditoria f0_usuarios f0_empresas_columnas f0_zona_horaria f0_integridad f0_costeo f0_rpc_atomicas f1_modulos_empresa f2_ventas f2_caja_ventas f2_ventas_rpc f3_ventas_reportes; do
+for s in f0_roles_rls f0_auditoria f0_usuarios f0_empresas_columnas f0_zona_horaria f0_integridad f0_costeo f0_rpc_atomicas f1_modulos_empresa f2_ventas f2_caja_ventas f2_ventas_rpc f3_ventas_reportes f4_reparto; do
   sql "$DIR/$s.sql"
 done
 echo "   ✓ re-ejecución sin errores"
