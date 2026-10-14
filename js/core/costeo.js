@@ -211,3 +211,118 @@ export function precioSugerido(costoRecetaCentavos, foodCostObjetivoPct, alicuot
     precioPublicoCentavos: precioPublico,
   };
 }
+
+// ============================================================
+// Rentabilidad REAL de lo vendido (Fase 3)
+// ------------------------------------------------------------
+// OJO con el nombre: costo de lo vendido = unidades × costo de la receta al
+// momento de la venta. Es el CMV TEÓRICO: no ve mermas, porciones de más ni
+// pérdidas. No es el "food cost real" (eso exige inventario). Se lo contrasta
+// con las COMPRAS del período: la diferencia es una señal, no una verdad.
+// ============================================================
+
+/** CMV teórico en %: costo de lo vendido sobre el ingreso. null si no hay ingreso. */
+export function cmvTeoricoPct(ingresoCentavos, costoCentavos) {
+  const ingreso = Number(ingresoCentavos) || 0;
+  if (ingreso <= 0) return null;
+  return ((Number(costoCentavos) || 0) / ingreso) * 100;
+}
+
+/**
+ * Mix de ventas: junta las filas por receta (varios días) y calcula participación.
+ * @param {Array<{receta_id:string, nombre:string, unidades:number, ingreso_centavos:number, costo_centavos:number}>} filas
+ * @returns {Array<{receta_id, nombre, unidades, ingreso, costo, margen, cmvPct, pctUnidades, pctIngreso}>} ordenado por ingreso desc
+ */
+export function mixDeVentas(filas) {
+  const por = new Map();
+  for (const f of filas || []) {
+    const a = por.get(f.receta_id) || { receta_id: f.receta_id, nombre: f.nombre, unidades: 0, ingreso: 0, costo: 0 };
+    a.unidades += Number(f.unidades) || 0;
+    a.ingreso += Number(f.ingreso_centavos) || 0;
+    a.costo += Number(f.costo_centavos) || 0;
+    a.nombre = f.nombre || a.nombre;
+    por.set(f.receta_id, a);
+  }
+  const lista = [...por.values()];
+  const totU = lista.reduce((s, x) => s + x.unidades, 0);
+  const totI = lista.reduce((s, x) => s + x.ingreso, 0);
+  return lista.map((x) => ({
+    ...x,
+    margen: x.ingreso - x.costo,
+    cmvPct: cmvTeoricoPct(x.ingreso, x.costo),
+    pctUnidades: totU > 0 ? (x.unidades / totU) * 100 : 0,
+    pctIngreso: totI > 0 ? (x.ingreso / totI) * 100 : 0,
+  })).sort((a, b) => b.ingreso - a.ingreso || a.nombre.localeCompare(b.nombre));
+}
+
+/** Días calendario del rango (ambos extremos incluidos). */
+function diasDelRango(desdeISO, hastaISO) {
+  const d = new Date(desdeISO + "T00:00:00Z"), h = new Date(hastaISO + "T00:00:00Z");
+  return Math.round((h - d) / 86400000) + 1;
+}
+
+/** Con menos de estos días el stock inicial/final distorsiona la brecha de compras. */
+export const DIAS_MIN_BRECHA = 28;
+
+/**
+ * Brecha entre lo COMPRADO y el costo teórico de lo vendido.
+ * Positiva = se compró más de lo que "explican" las ventas (posible desperdicio, stock que
+ * se acumula o recetas desactualizadas). Con período corto no es confiable.
+ * @returns {{brechaCentavos:number, brechaPct:number|null, periodoCorto:boolean, dias:number}}
+ */
+export function brechaComprasVsCmv(comprasCentavos, cmvTeoricoCentavos, desdeISO, hastaISO) {
+  const compras = Number(comprasCentavos) || 0, cmv = Number(cmvTeoricoCentavos) || 0;
+  const dias = diasDelRango(desdeISO, hastaISO);
+  return {
+    brechaCentavos: compras - cmv,
+    brechaPct: cmv > 0 ? ((compras - cmv) / cmv) * 100 : null,
+    periodoCorto: dias < DIAS_MIN_BRECHA,
+    dias,
+  };
+}
+
+const NOMBRE_DOW = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+/**
+ * Ventas por día de la semana (1 = lunes … 7 = domingo) a partir de las filas por día.
+ * @returns {Array<{dow:number, nombre:string, dias:number, pedidos:number, ingreso:number, promedioPorDia:number}>}
+ */
+export function ventasPorDiaSemana(filasDia) {
+  const acc = Array.from({ length: 7 }, (_, i) => ({ dow: i + 1, nombre: NOMBRE_DOW[i + 1], dias: 0, pedidos: 0, ingreso: 0 }));
+  for (const f of filasDia || []) {
+    const [a, m, d] = String(f.fecha_operativa).split("-").map(Number);
+    const jsDow = new Date(Date.UTC(a, m - 1, d)).getUTCDay(); // 0 = domingo
+    const x = acc[jsDow === 0 ? 6 : jsDow - 1];
+    x.dias += 1; x.pedidos += Number(f.pedidos) || 0; x.ingreso += Number(f.ingreso_centavos) || 0;
+  }
+  return acc.map((x) => ({ ...x, promedioPorDia: x.dias ? Math.round(x.ingreso / x.dias) : 0 }));
+}
+
+/** Ventas por hora local (suma de todos los días del rango), ordenadas por hora. */
+export function ventasPorFranja(filasHora) {
+  const por = new Map();
+  for (const f of filasHora || []) {
+    const x = por.get(f.hora) || { hora: f.hora, pedidos: 0, ingreso: 0 };
+    x.pedidos += Number(f.pedidos) || 0; x.ingreso += Number(f.ingreso_centavos) || 0;
+    por.set(f.hora, x);
+  }
+  return [...por.values()].sort((a, b) => a.hora - b.hora);
+}
+
+/** Totales del período a partir de las filas por día. */
+export function totalesPeriodo(filasDia) {
+  const t = { pedidos: 0, ingreso: 0, productosNetos: 0, descuento: 0, envio: 0, costo: 0, anulados: 0, montoAnulado: 0 };
+  for (const f of filasDia || []) {
+    t.pedidos += Number(f.pedidos) || 0; t.ingreso += Number(f.ingreso_centavos) || 0;
+    t.productosNetos += Number(f.productos_netos_centavos) || 0; t.descuento += Number(f.descuento_centavos) || 0;
+    t.envio += Number(f.envio_centavos) || 0; t.costo += Number(f.costo_centavos) || 0;
+    t.anulados += Number(f.anulados) || 0; t.montoAnulado += Number(f.monto_anulado_centavos) || 0;
+  }
+  return {
+    ...t,
+    cmvPct: cmvTeoricoPct(t.productosNetos, t.costo),                 // sobre productos netos de descuento, sin envío
+    margenBruto: t.productosNetos - t.costo,
+    ticketPromedio: t.pedidos ? Math.round(t.ingreso / t.pedidos) : 0,
+    pctAnulados: t.pedidos + t.anulados > 0 ? (t.anulados / (t.pedidos + t.anulados)) * 100 : 0,
+  };
+}

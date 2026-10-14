@@ -964,7 +964,7 @@ El mostrador depende de internet. Versión 1:
 
 ---
 
-## Fase 3 — Rentabilidad real (ventas × costo)
+## Fase 3 — Rentabilidad real (ventas × costo)  ✅ implementada
 
 **Objetivo:** que la rentabilidad muestre **lo que realmente se vendió y cuánto
 costó**, con la honestidad metodológica que corresponde.
@@ -1380,7 +1380,7 @@ Los existentes quedan como están.
 | 10 | `f2_ventas.sql` (config, tablas, RLS, `fecha_operativa`) | 2 |
 | 11 | `f2_caja_ventas.sql` (cambios a `movimientos_caja`) | 2.5 |
 | 11b | `f2_ventas_rpc.sql` (RPC del mostrador) | 2.4 |
-| 12 | `f3_ventas_reportes.sql` | 3 |
+| 12 | `f3_ventas_reportes.sql` (vistas `v_ventas_*`, `compras_periodo`, `set_config_reportes`) | 3 |
 | 13 | `f4_reparto.sql` | 4 |
 
 Cada fase entrega además su carpeta de tests en `supabase/tests/`.

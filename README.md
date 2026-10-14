@@ -98,6 +98,10 @@ En resumen:
 > Flujo de caja sea una baja lógica. Las pantallas (Mostrador, Historial, Configuración) están en la entrega 2/2: no requieren más SQL.
 > El módulo `ventas` se activa por empresa (ver Fase 1).
 
+> **Fase 3 (Ventas reales)** — después de la Fase 2, ejecutar UNA vez `supabase/f3_ventas_reportes.sql`
+> (idempotente; solo agrega vistas y funciones de lectura). Agrega **Rentabilidad de carta → Ventas reales**
+> para empresas con el módulo Ventas.
+
 > **¿Ya tenías el proyecto corriendo antes de esta versión?** Además de lo de
 > arriba, corré una vez `supabase/migracion_impuesto_interno.sql` (agrega el
 > campo de impuesto interno / otros impuestos no recuperables a Facturas) y

@@ -26,6 +26,7 @@ import * as config from "./config.js";
 import * as ventasMostrador from "./ventasMostrador.js";
 import * as ventasHistorial from "./ventasHistorial.js";
 import * as ventasConfig from "./ventasConfig.js";
+import * as ventasReales from "./ventasReales.js";
 import * as rrhhEmpleados from "./rrhhEmpleados.js";
 import * as rrhhVencimientos from "./rrhhVencimientos.js";
 import * as rrhhConfig from "./rrhhConfig.js";
@@ -76,6 +77,7 @@ const MENU = [
       { clave: "recetas", titulo: "Platos y preparaciones", montar: recetas.montar },
       { clave: "carta", titulo: "Carta", montar: carta.montar },
       { clave: "rentabilidad", titulo: "Rentabilidad de carta", montar: rentabilidad.montar },
+      { clave: "ventas_reales", titulo: "Ventas reales", montar: ventasReales.montar, modulo: "ventas", roles: ["ADMIN", "GERENTE", "AUDITOR"] },
     ],
   },
   {
@@ -113,12 +115,16 @@ function permitido(entrada) {
 function moduloHabilitado(grupo) {
   return moduloActivo(perfil && perfil.empresa && perfil.empresa.modulos, grupo.id);
 }
+// Un ítem puede exigir otro módulo además del de su grupo (ej. "Ventas reales" requiere `ventas`).
+function itemHabilitado(it) {
+  return !it.modulo || moduloActivo(perfil && perfil.empresa && perfil.empresa.modulos, it.modulo);
+}
 // Grupos visibles para el rol actual, con sus ítems ya filtrados.
 function menuVisible() {
   return MENU
     .filter(moduloHabilitado)
     .filter(permitido)
-    .map((g) => ({ ...g, items: g.items.filter(permitido) }))
+    .map((g) => ({ ...g, items: g.items.filter((it) => permitido(it) && itemHabilitado(it)) }))
     .filter((g) => g.items.length);
 }
 
@@ -196,7 +202,7 @@ function grupoDe(clave) {
 function puedeVerClave(clave) {
   const g = grupoDe(clave);
   const it = g && g.items.find((i) => i.clave === clave);
-  return !!(g && it && moduloHabilitado(g) && permitido(g) && permitido(it));
+  return !!(g && it && moduloHabilitado(g) && permitido(g) && permitido(it) && itemHabilitado(it));
 }
 
 function construirMenu() {
