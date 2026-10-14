@@ -102,6 +102,7 @@ function tabDatos(body) {
         <div class="fila">
           <div>${labelInfo("fd-tel", "Teléfono")}<input id="fd-tel" value="${escapar(EMP.telefono || "")}" /></div>
         </div>
+        <div id="fd-horas-wrap"></div>
         <div>${labelInfo("fd-foto", "URL de foto")}<input id="fd-foto" value="${escapar(EMP.foto_url || "")}" placeholder="https://…" /></div>
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
           <button type="submit">Guardar cambios</button>
@@ -114,6 +115,14 @@ function tabDatos(body) {
     </div>`;
 
   const g = (s) => body.querySelector(s);
+  // Horas mensuales estimadas: solo si el sueldo vigente es por hora (el tablero de reparto las usa para pasar a mensual).
+  if (esAdmin()) {
+    sueldosRepo.vigente(EMP.id).then((v) => {
+      if (!v || v.tipo !== "por_hora" || !g("#fd-horas-wrap")) return;
+      g("#fd-horas-wrap").innerHTML = `<div class="fila"><div>${labelInfo("fd-horas", "Horas mensuales estimadas", "Su sueldo es por hora: el Tablero de reparto lo pasa a mensual con estas horas. Si falta, no se suma.")}
+        <input id="fd-horas" type="number" min="0" max="744" step="1" value="${escapar(EMP.horas_mensuales_estimadas == null ? "" : String(EMP.horas_mensuales_estimadas))}" /></div></div>`;
+    }).catch(() => {});
+  }
   g("#fd").addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = g("#fd-msg");
@@ -125,6 +134,7 @@ function tabDatos(body) {
         apodo: g("#fd-apodo").value, puesto: g("#fd-puesto").value,
         fecha_ingreso: g("#fd-ingreso").value, fecha_alta: g("#fd-alta").value, telefono: g("#fd-tel").value,
         foto_url: g("#fd-foto").value,
+        ...(g("#fd-horas") ? { horas_mensuales_estimadas: g("#fd-horas").value === "" ? null : Number(g("#fd-horas").value) } : {}),
       });
       await recargarEmp();
       setMsg(msg, "Guardado ✔", "ok");

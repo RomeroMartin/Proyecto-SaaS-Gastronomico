@@ -27,6 +27,9 @@ import * as ventasMostrador from "./ventasMostrador.js";
 import * as ventasHistorial from "./ventasHistorial.js";
 import * as ventasConfig from "./ventasConfig.js";
 import * as ventasReales from "./ventasReales.js";
+import * as repartoTablero from "./repartoTablero.js";
+import * as repartoGastos from "./repartoGastos.js";
+import * as repartoConfig from "./repartoConfig.js";
 import * as rrhhEmpleados from "./rrhhEmpleados.js";
 import * as rrhhVencimientos from "./rrhhVencimientos.js";
 import * as rrhhConfig from "./rrhhConfig.js";
@@ -46,6 +49,7 @@ const ICONOS = {
   rrhh: svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
   config: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   ventas: svg('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'),
+  reparto: svg('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
   chevron: svg('<polyline points="9 18 15 12 9 6"/>'),
 };
 
@@ -86,6 +90,14 @@ const MENU = [
       { clave: "ventas_mostrador", titulo: "Mostrador", montar: ventasMostrador.montar, roles: ["ADMIN", "GERENTE", "CAJERO"] },
       { clave: "ventas_historial", titulo: "Historial de turnos", montar: ventasHistorial.montar, roles: ["ADMIN", "GERENTE", "AUDITOR"] },
       { clave: "ventas_config", titulo: "Configuración", montar: ventasConfig.montar, roles: ["ADMIN"] },
+    ],
+  },
+  {
+    id: "reparto", titulo: "Reparto de ingresos", icono: ICONOS.reparto, roles: ["ADMIN"],
+    items: [
+      { clave: "reparto_tablero", titulo: "Tablero", montar: repartoTablero.montar },
+      { clave: "reparto_gastos", titulo: "Gastos fijos", montar: repartoGastos.montar },
+      { clave: "reparto_config", titulo: "Configuración", montar: repartoConfig.montar },
     ],
   },
   {

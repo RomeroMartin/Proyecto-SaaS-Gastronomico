@@ -258,6 +258,37 @@ Instalá la térmica como impresora del equipo (cualquier modelo de 58 u 80 mm).
 5. Para que imprima **sin mostrar el diálogo**, abrí Chrome con `--kiosk-printing` (acceso directo →
    Propiedades → Destino: agregar `--kiosk-printing`).
 
+## 5c. Módulo Reparto de ingresos (solo ADMIN)
+
+Un tablero **informativo** ("apartados"): cuánto de lo que entra ya está comprometido y cuánto te queda de verdad.
+**No mueve plata ni genera movimientos de caja.** Solo lo ve el ADMIN (incluye la masa salarial).
+
+### Preparación
+1. **Reparto → Configuración**: CMV objetivo (% de las ventas que se va en mercadería, mientras no haya datos propios),
+   **costos variables** (comisiones de tarjeta/QR, Ingresos Brutos, envases…), días operativos por mes, qué
+   **categorías de ingreso de caja son ventas** y, si usás RRHH, las **cargas sociales %** y si se **provisiona el aguinaldo**.
+2. **Reparto → Gastos fijos**: cargá alquiler, servicios, retiro del dueño, etc. (nombre, categoría, monto mensual,
+   día de vencimiento y las **categorías de egreso del Flujo de caja** que cuentan como "ya pagado").
+3. **Sueldos**: si tu plan incluye RRHH salen **de RRHH** (no los cargues como gasto fijo, se contarían dos veces):
+   sueldo vigente de cada empleado activo, más cargas (solo empleados dados de alta y en relación de dependencia) y
+   provisión de aguinaldo (1/12 por mes; los monotributistas no generan cargas ni aguinaldo). Si el sueldo es por
+   hora, completá **Horas mensuales estimadas** en la ficha del empleado (RRHH → Empleado → Datos). Sin RRHH, los
+   sueldos se cargan como gasto fijo de categoría `sueldos`.
+
+### Qué muestra el Tablero
+- **Ventas del mes** (ingresos de caja de las categorías de venta, también los cargados a mano), **punto de equilibrio**
+  (mensual y por día), **ganancia estimada** y **proyección a fin de mes** (ponderada por día de la semana si hay
+  histórico; si no, una estimación simple lineal).
+- **De cada $10.000 que entran**: cuánto va a proveedores, a costos variables, a cada gasto fijo y cuánto es ganancia
+  (cuando el mes ya cubrió el equilibrio, el resto es ganancia).
+- **Reparto del último día con ventas**: cuánto separar para cada sobre; las partes suman exactamente el total.
+- **Sobres**: una tarjeta por gasto fijo, una de Proveedores (con la deuda actual y lo agendado a 7 días) y una de
+  Costos variables, con barra, objetivo, vencimiento y estado (cubierto / en ritmo / atrasado / pagado).
+- Avisos: posible duplicado entre cierres de caja y ventas cargadas a mano, empleados por hora sin horas, empleados
+  sin alta y gastos fijos de sueldos que se ignoran porque salen de RRHH.
+- El **CMV** usado es el teórico del mes (módulo Ventas) cuando hay al menos 7 días con ventas y 100 unidades; si no,
+  el objetivo de la empresa.
+
 ## 6. Configuración
 
 ### 6.1 Empresa
