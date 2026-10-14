@@ -198,6 +198,22 @@ Análisis fino: **food cost % y margen por plato y por sector**, con **semáforo
 
 ---
 
+### 5.5 Ventas reales (si tu plan incluye Ventas)
+Muestra lo que **realmente se vendió** en un rango (7 / 30 días, este mes, mes anterior o fechas a elección), por
+**día operativo** y sin pedidos anulados.
+- **Ventas cobradas** coincide con lo volcado al Flujo de caja por los cierres.
+- **Costo de lo vendido (teórico)**: unidades × costo de la receta *al momento de vender*. Es el **CMV teórico**:
+  no ve mermas, porciones de más ni pérdidas, por eso no se llama "real". El **CMV teórico %** se calcula sobre los
+  productos vendidos netos de descuento (sin envíos).
+- **Compras del período vs costo teórico**: suma las facturas (neto + IVA) de los rubros que cuentan como mercadería
+  (por defecto no cuentan Limpieza ni Descartables; el ADMIN lo cambia con **Cambiar rubros**). La **brecha** es una
+  señal: si es positiva de forma sostenida puede haber desperdicio, porciones de más, stock acumulado o recetas
+  desactualizadas. Con rangos de menos de 28 días no es confiable y se avisa.
+- **Por plato**: unidades, ingreso (al precio con que se cobró cada venta), costo teórico, CMV, participación en las
+  ventas y comparación contra el food cost teórico de la carta de hoy.
+- **Por día de la semana** y **por franja horaria** (hora local).
+- **Exportar a Excel** baja la tabla por plato. Si hay insumos con precio sin actualizar hace más de 30 días, se avisa.
+
 ## 5b. Módulo Ventas (mostrador)
 
 Solo aparece si tu plan incluye **Ventas**. Pensado para locales con mostrador o venta rápida.

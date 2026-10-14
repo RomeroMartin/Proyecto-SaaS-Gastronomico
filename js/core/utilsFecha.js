@@ -146,3 +146,23 @@ export function formatearFecha(iso) {
   if (!p) return "—";
   return `${String(p.d).padStart(2, "0")}/${String(p.m).padStart(2, "0")}/${p.a}`;
 }
+
+/**
+ * Rangos predefinidos de reportes, a partir de "hoy" (ISO).
+ * 7d / 30d: los últimos N días incluido hoy · mes: del 1.º a hoy · mes_anterior: mes calendario previo completo.
+ * @returns {{desde:string, hasta:string}|null}
+ */
+export function rangoPreset(clave, hoy) {
+  const p = partes(hoy);
+  if (!p) return null;
+  const iso = (a, m, d) => `${String(a).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  if (clave === "7d") return { desde: addDias(hoy, -6), hasta: hoy };
+  if (clave === "30d") return { desde: addDias(hoy, -29), hasta: hoy };
+  if (clave === "mes") return { desde: iso(p.a, p.m, 1), hasta: hoy };
+  if (clave === "mes_anterior") {
+    const am = p.m === 1 ? { a: p.a - 1, m: 12 } : { a: p.a, m: p.m - 1 };
+    const ult = new Date(Date.UTC(am.a, am.m, 0)).getUTCDate();
+    return { desde: iso(am.a, am.m, 1), hasta: iso(am.a, am.m, ult) };
+  }
+  return null;
+}
