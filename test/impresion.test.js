@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { medidasTicket, htmlTicket, columnasPapel, htmlTicketImagen, renderizarTicket } from "../js/saas/ui/impresion.js";
+import { medidasTicket, htmlTicket, columnasPapel, htmlTicketImagen, renderizarTicket, textoParaDriver } from "../js/saas/ui/impresion.js";
 import { caracteresPorLinea } from "../js/core/ventas.js";
 
 const texto = Array.from({ length: 12 }, (_, i) => "línea " + i).join("\n");
@@ -67,4 +67,11 @@ test("htmlTicketImagen: página de tamaño explícito, imagen al ancho imprimibl
 
 test("renderizarTicket sin canvas (Node) devuelve null y se imprime como texto", () => {
   assert.equal(renderizarTicket("hola", 80), null);
+});
+
+test("textoParaDriver: solo ASCII, símbolos reemplazados y líneas en blanco → regla de guiones", () => {
+  const t = textoParaDriver("PEDIDO #001  ·  Café\n\n2× Ñandú $20.000\n\n\nTOTAL: $23.500\n", 32);
+  assert.equal(t, ["PEDIDO #001  -  Cafe", "-".repeat(32), "2x Nandu $20.000", "-".repeat(32), "TOTAL: $23.500"].join("\n"));
+  assert.match(textoParaDriver("a\n\nb", 42), new RegExp("-{42}"));
+  assert.doesNotMatch(textoParaDriver("ñ é ü × ·", 32), /[^\x20-\x7e\n]/);
 });

@@ -99,6 +99,27 @@ pre { margin: 0; box-sizing: border-box; width: ${m.anchoMm}mm; padding: ${MARGE
 </style></head><body><pre>${esc}</pre></body></html>`;
 }
 
+/**
+ * Texto apto para el modo "texto": el driver usa la letra interna de la impresora (solo ASCII seguro) y
+ * descarta las líneas vacías, así que se quitan tildes/símbolos raros ("×" → "x", "·" → "-") y cada tramo en
+ * blanco se reemplaza por una línea de guiones (si no, todo sale pegado).
+ */
+export function textoParaDriver(texto, columnas = 32) {
+  const limpio = String(texto)
+    .replace(/[×✕]/g, "x").replace(/[·•]/g, "-").replace(/[–—]/g, "-").replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7e\n]/g, "");
+  const regla = "-".repeat(columnas);
+  const salida = [];
+  let enBlanco = false;
+  for (const ln of limpio.split("\n")) {
+    if (ln.trim() === "") { if (!enBlanco && salida.length) salida.push(regla); enBlanco = true; continue; }
+    enBlanco = false; salida.push(ln.replace(/\s+$/, ""));
+  }
+  if (salida.length && salida[salida.length - 1] === regla) salida.pop();
+  return salida.join("\n");
+}
+
 const PUNTOS_POR_MM = 8; // 203 dpi ≈ 8 puntos por mm (térmicas estándar)
 
 /**
@@ -167,7 +188,8 @@ export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel(), colaM
       const doc = marco.contentWindow.document;
       doc.open();
       const dib = formato === "texto" ? null : renderizarTicket(texto, anchoMm);
-      doc.write(dib ? htmlTicketImagen(dib.src, dib.altoMm, anchoMm, modo, colaMm) : htmlTicket(texto, anchoMm, modo, colaMm));
+      doc.write(dib ? htmlTicketImagen(dib.src, dib.altoMm, anchoMm, modo, colaMm)
+        : htmlTicket(formato === "texto" ? textoParaDriver(texto, columnasPapel(anchoMm)) : texto, anchoMm, modo, colaMm));
       doc.close();
       const limpiar = () => setTimeout(() => { try { marco.remove(); } catch (_e) { /* ya no está */ } }, 1500);
       const imagen = marco.contentWindow.document.querySelector("img");
