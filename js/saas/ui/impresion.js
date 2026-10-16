@@ -38,6 +38,17 @@ export function setModoPapel(modo) {
   try { localStorage.setItem(LS_MODO, MODOS_PAPEL[modo] ? modo : "ajustado"); } catch (_e) { /* sin almacenamiento */ }
 }
 
+// Formato: "imagen" (sale igual que la vista previa) o "texto" (la letra interna de la impresora, como antes).
+// Por equipo: si en alguna impresora la imagen no sale, se vuelve a "texto" desde Configuración de ventas.
+export const MODOS_FORMATO = { imagen: "Imagen (igual que la vista previa)", texto: "Texto (letra interna de la impresora)" };
+const LS_FORMATO = "saas_impresion_formato";
+export function getFormato() {
+  try { const v = localStorage.getItem(LS_FORMATO); return MODOS_FORMATO[v] ? v : "imagen"; } catch (_e) { return "imagen"; }
+}
+export function setFormato(f) {
+  try { localStorage.setItem(LS_FORMATO, MODOS_FORMATO[f] ? f : "imagen"); } catch (_e) { /* sin almacenamiento */ }
+}
+
 const LS_COLA = "saas_impresion_cola_mm";
 /** Espacio en blanco al final del ticket, en mm (por equipo): para las impresoras con corte automático. */
 export function getColaMm() {
@@ -144,22 +155,25 @@ img { display: block; width: ${p.imprimibleMm}mm; height: ${altoImagenMm}mm; mar
  * @param {string} modo    ajustado | driver (por defecto, el elegido en este equipo)
  * @returns {Promise<{ok:boolean, error?:string}>}
  */
-export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel(), colaMm = getColaMm()) {
+export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel(), colaMm = getColaMm(), formato = getFormato()) {
   return new Promise((resolve) => {
     let marco;
     try {
       marco = document.createElement("iframe");
       marco.setAttribute("aria-hidden", "true");
-      marco.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+      // Fuera de pantalla pero con tamaño real (no 0x0 ni "hidden"): Chrome puede omitir las imágenes de un marco invisible.
+      marco.style.cssText = "position:fixed;left:-10000px;top:0;width:300px;height:600px;border:0;";
       document.body.appendChild(marco);
       const doc = marco.contentWindow.document;
       doc.open();
-      const dib = renderizarTicket(texto, anchoMm);
+      const dib = formato === "texto" ? null : renderizarTicket(texto, anchoMm);
       doc.write(dib ? htmlTicketImagen(dib.src, dib.altoMm, anchoMm, modo, colaMm) : htmlTicket(texto, anchoMm, modo, colaMm));
       doc.close();
       const limpiar = () => setTimeout(() => { try { marco.remove(); } catch (_e) { /* ya no está */ } }, 1500);
       const imagen = marco.contentWindow.document.querySelector("img");
-      const listo = imagen && !imagen.complete ? new Promise((ok) => { imagen.onload = imagen.onerror = ok; }) : Promise.resolve();
+      // la imagen tiene que estar cargada Y decodificada antes de imprimir (si no, puede salir en blanco)
+      const listo = !imagen ? Promise.resolve()
+        : (imagen.complete ? Promise.resolve() : new Promise((ok) => { imagen.onload = imagen.onerror = ok; })).then(() => (imagen.decode ? imagen.decode().catch(() => {}) : null));
       Promise.race([listo, new Promise((ok) => setTimeout(ok, 1500))]).then(() => setTimeout(() => {
         try {
           marco.contentWindow.focus();
