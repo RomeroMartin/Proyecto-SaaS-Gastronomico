@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { medidasTicket, htmlTicket, columnasPapel, htmlTicketImagen, renderizarTicket, textoParaDriver } from "../js/saas/ui/impresion.js";
+import { medidasTicket, htmlTicket, columnasPapel, htmlTicketImagen, renderizarTicket, textoParaDriver, lineasDeCola } from "../js/saas/ui/impresion.js";
 import { caracteresPorLinea } from "../js/core/ventas.js";
 
 const texto = Array.from({ length: 12 }, (_, i) => "línea " + i).join("\n");
@@ -49,7 +49,7 @@ test("htmlTicket: @page con medidas explícitas (sin 'auto'), sin márgenes y co
 });
 
 test("espacio en blanco al final: configurable, acotado y presente en el alto y en el HTML", () => {
-  assert.equal(medidasTicket(texto, 80, 500).colaMm, 80);   // tope
+  assert.equal(medidasTicket(texto, 80, 500).colaMm, 150);  // tope
   assert.equal(medidasTicket(texto, 80, -5).colaMm, 0);
   assert.match(htmlTicket(texto, 80, "driver", 25), /padding: 3mm 4mm 25mm/);
   const largo = Array.from({ length: 40 }, (_, i) => "l" + i).join("\n");
@@ -74,4 +74,13 @@ test("textoParaDriver: solo ASCII, símbolos reemplazados y líneas en blanco �
   assert.equal(t, ["PEDIDO #001  -  Cafe", "-".repeat(32), "2x Nandu $20.000", "-".repeat(32), "TOTAL: $23.500"].join("\n"));
   assert.match(textoParaDriver("a\n\nb", 42), new RegExp("-{42}"));
   assert.doesNotMatch(textoParaDriver("ñ é ü × ·", 32), /[^\x20-\x7e\n]/);
+});
+
+test("textoParaDriver: renglones de relleno al final (espacios o puntos) según los mm de cola", () => {
+  assert.equal(lineasDeCola(0), 0);
+  assert.equal(lineasDeCola(35), 10);
+  const a = textoParaDriver("a\nb", 32, 3, "espacios").split("\n");
+  assert.deepEqual(a, ["a", "b", " ", " ", " "]);
+  assert.deepEqual(textoParaDriver("a", 32, 2, "puntos").split("\n"), ["a", ".", "."]);
+  assert.equal(textoParaDriver("a", 32), "a");
 });

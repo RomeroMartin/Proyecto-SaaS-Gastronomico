@@ -8,7 +8,7 @@
 
 import * as ventasRepo from "../data/ventasRepo.js";
 import { MEDIOS_PAGO, NOMBRE_MEDIO, PLANTILLA_COMANDA, textoComanda, textoTicket } from "../../core/ventas.js";
-import { imprimirTicket, MODOS_PAPEL, getModoPapel, setModoPapel, getColaMm, setColaMm, MODOS_FORMATO, getFormato, setFormato } from "./impresion.js";
+import { imprimirTicket, MODOS_PAPEL, getModoPapel, setModoPapel, getColaMm, setColaMm, MODOS_FORMATO, getFormato, setFormato, MODOS_RELLENO, getRelleno, setRelleno } from "./impresion.js";
 import { pesosACentavos } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo } from "./helpers.js";
 
@@ -56,8 +56,10 @@ export async function montar(container, perfil) {
           <select id="vc-papel">${Object.entries(MODOS_PAPEL).map(([v, l]) => `<option value="${v}" ${getModoPapel() === v ? "selected" : ""}>${escapar(l)}</option>`).join("")}</select></div></div>
         <div class="fila"><div>${labelInfo("vc-formato", "Formato de impresión (solo este equipo)", "'Imagen' hace que el ticket salga igual que la vista previa (recomendado). Si en tu impresora no sale nada o sale en blanco, probá 'Texto'. Se guarda en este equipo.")}
           <select id="vc-formato">${Object.entries(MODOS_FORMATO).map(([v, l]) => `<option value="${v}" ${getFormato() === v ? "selected" : ""}>${escapar(l)}</option>`).join("")}</select></div></div>
+        <div class="fila"><div>${labelInfo("vc-relleno", "Relleno del final en modo Texto (solo este equipo)", "En modo Texto el espacio en blanco del final se logra con renglones vacíos. Si con 'en blanco' el papel no avanza hasta la cuchilla o el último renglón sale en el ticket siguiente, probá 'con un punto'. Se guarda en este equipo.")}
+          <select id="vc-relleno">${Object.entries(MODOS_RELLENO).map(([v, l]) => `<option value="${v}" ${getRelleno() === v ? "selected" : ""}>${escapar(l)}</option>`).join("")}</select></div></div>
         <div class="fila"><div>${labelInfo("vc-cola", "Espacio en blanco al final (mm, solo este equipo)", "Papel que avanza después del último renglón. Si tu impresora tiene corte automático, sirve para que la cuchilla corte debajo del texto y no encima. Probá con 20 y subí o bajá de a 5.")}
-          <input id="vc-cola" type="number" min="0" max="80" step="1" value="${getColaMm()}" /></div></div>
+          <input id="vc-cola" type="number" min="0" max="150" step="1" value="${getColaMm()}" /></div></div>
         <p class="muted" style="font-size:12.5px;">El corte lo hace la impresora, no la página: en <b>Preferencias de la impresora (Windows)</b> activá el <b>corte automático al final del documento o de la página</b>.</p>
         <button type="button" id="vc-prueba" class="secundario" style="margin-top:8px;">Imprimir ticket de prueba</button>
         <span id="vc-prueba-msg" class="muted" style="font-size:12.5px;margin-left:8px;"></span>
@@ -94,6 +96,7 @@ export async function montar(container, perfil) {
 
   $(container, "#vc-papel").addEventListener("change", (e) => setModoPapel(e.target.value));
   $(container, "#vc-formato").addEventListener("change", (e) => setFormato(e.target.value));
+  $(container, "#vc-relleno").addEventListener("change", (e) => setRelleno(e.target.value));
   $(container, "#vc-cola").addEventListener("change", (e) => { setColaMm(e.target.value); e.target.value = getColaMm(); });
   $(container, "#vc-prueba").addEventListener("click", async () => {
     const msg = $(container, "#vc-prueba-msg");
@@ -106,7 +109,7 @@ export async function montar(container, perfil) {
       pagos: [{ medio: "efectivo", monto_centavos: 2350000 }],
     };
     msg.textContent = "Enviando a la impresora…";
-    const r = await imprimirTicket(textoTicket(ej, { negocio: c.negocio, plantilla: $(container, "#vc-plantilla").value, zona: c.zona_horaria, anchoMm: ancho }), ancho, $(container, "#vc-papel").value, Number($(container, "#vc-cola").value), $(container, "#vc-formato").value);
+    const r = await imprimirTicket(textoTicket(ej, { negocio: c.negocio, plantilla: $(container, "#vc-plantilla").value, zona: c.zona_horaria, anchoMm: ancho }), ancho, $(container, "#vc-papel").value, Number($(container, "#vc-cola").value), $(container, "#vc-formato").value, $(container, "#vc-relleno").value);
     msg.textContent = r.ok ? "Enviado. Revisá que salga completo y del largo justo." : "No se pudo imprimir: " + r.error;
   });
 

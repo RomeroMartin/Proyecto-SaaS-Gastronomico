@@ -24,7 +24,8 @@ const INTERLINEADO = 1.25;
 const ALTO_MIN_SOBRE_ANCHO_MM = 12;  // la página SIEMPRE es más alta que ancha: si no, Chrome la manda horizontal y el driver la gira 90°
 const MARGEN_VERTICAL_MM = 3;   // arriba y abajo
 const COLA_POR_DEFECTO_MM = 20; // papel en blanco al final: la cuchilla corta unos mm DESPUÉS del último renglón
-const COLA_MAX_MM = 80;
+const COLA_MAX_MM = 150;
+const MM_POR_LINEA_TEXTO = 3.5; // alto aproximado de un renglón con la letra interna de la térmica
 
 // Cada driver de térmica trata el papel distinto, así que el modo se elige POR EQUIPO (la impresora es de la PC):
 //   ajustado → la página tiene el ancho del rollo y el alto del ticket (recomendado)
@@ -48,6 +49,19 @@ export function getFormato() {
 export function setFormato(f) {
   try { localStorage.setItem(LS_FORMATO, MODOS_FORMATO[f] ? f : "imagen"); } catch (_e) { /* sin almacenamiento */ }
 }
+
+// Relleno del final en modo Texto: renglones que empujan el papel hasta la cuchilla (y obligan a la impresora a
+// sacar el último renglón real). "espacios" no imprime nada; "puntos" imprime un "." por renglón (si el driver ignora los espacios).
+export const MODOS_RELLENO = { espacios: "Renglones en blanco (recomendado)", puntos: "Renglones con un punto (si el papel no avanza)" };
+const LS_RELLENO = "saas_impresion_relleno";
+export function getRelleno() {
+  try { const v = localStorage.getItem(LS_RELLENO); return MODOS_RELLENO[v] ? v : "espacios"; } catch (_e) { return "espacios"; }
+}
+export function setRelleno(r) {
+  try { localStorage.setItem(LS_RELLENO, MODOS_RELLENO[r] ? r : "espacios"); } catch (_e) { /* sin almacenamiento */ }
+}
+/** Cantidad de renglones de relleno para `mm` de papel en blanco. */
+export function lineasDeCola(mm) { return Math.ceil(limitarCola(mm) / MM_POR_LINEA_TEXTO); }
 
 const LS_COLA = "saas_impresion_cola_mm";
 /** Espacio en blanco al final del ticket, en mm (por equipo): para las impresoras con corte automático. */
@@ -104,7 +118,7 @@ pre { margin: 0; box-sizing: border-box; width: ${m.anchoMm}mm; padding: ${MARGE
  * descarta las líneas vacías, así que se quitan tildes/símbolos raros ("×" → "x", "·" → "-") y cada tramo en
  * blanco se reemplaza por una línea de guiones (si no, todo sale pegado).
  */
-export function textoParaDriver(texto, columnas = 32) {
+export function textoParaDriver(texto, columnas = 32, lineasCola = 0, relleno = "espacios") {
   const limpio = String(texto)
     .replace(/[×✕]/g, "x").replace(/[·•]/g, "-").replace(/[–—]/g, "-").replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -117,6 +131,7 @@ export function textoParaDriver(texto, columnas = 32) {
     enBlanco = false; salida.push(ln.replace(/\s+$/, ""));
   }
   if (salida.length && salida[salida.length - 1] === regla) salida.pop();
+  for (let i = 0; i < lineasCola; i++) salida.push(relleno === "puntos" ? "." : " ");
   return salida.join("\n");
 }
 
@@ -176,7 +191,7 @@ img { display: block; width: ${p.imprimibleMm}mm; height: ${altoImagenMm}mm; mar
  * @param {string} modo    ajustado | driver (por defecto, el elegido en este equipo)
  * @returns {Promise<{ok:boolean, error?:string}>}
  */
-export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel(), colaMm = getColaMm(), formato = getFormato()) {
+export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel(), colaMm = getColaMm(), formato = getFormato(), relleno = getRelleno()) {
   return new Promise((resolve) => {
     let marco;
     try {
@@ -189,7 +204,7 @@ export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel(), colaM
       doc.open();
       const dib = formato === "texto" ? null : renderizarTicket(texto, anchoMm);
       doc.write(dib ? htmlTicketImagen(dib.src, dib.altoMm, anchoMm, modo, colaMm)
-        : htmlTicket(formato === "texto" ? textoParaDriver(texto, columnasPapel(anchoMm)) : texto, anchoMm, modo, colaMm));
+        : htmlTicket(formato === "texto" ? textoParaDriver(texto, columnasPapel(anchoMm), lineasDeCola(colaMm), relleno) : texto, anchoMm, modo, colaMm));
       doc.close();
       const limpiar = () => setTimeout(() => { try { marco.remove(); } catch (_e) { /* ya no está */ } }, 1500);
       const imagen = marco.contentWindow.document.querySelector("img");
