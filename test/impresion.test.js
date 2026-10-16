@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { medidasTicket, htmlTicket, columnasPapel } from "../js/saas/ui/impresion.js";
+import { medidasTicket, htmlTicket, columnasPapel, htmlTicketImagen, renderizarTicket } from "../js/saas/ui/impresion.js";
 import { caracteresPorLinea } from "../js/core/ventas.js";
 
 const texto = Array.from({ length: 12 }, (_, i) => "línea " + i).join("\n");
@@ -54,4 +54,17 @@ test("espacio en blanco al final: configurable, acotado y presente en el alto y 
   assert.match(htmlTicket(texto, 80, "driver", 25), /padding: 3mm 4mm 25mm/);
   const largo = Array.from({ length: 40 }, (_, i) => "l" + i).join("\n");
   assert.equal(medidasTicket(largo, 80, 30).altoMm - medidasTicket(largo, 80, 0).altoMm, 30);
+});
+
+test("htmlTicketImagen: página de tamaño explícito, imagen al ancho imprimible y sin A4", () => {
+  const html = htmlTicketImagen("data:image/png;base64,AAAA", 40, 58, "ajustado", 20);
+  assert.match(html, /@page \{ size: 58mm \d+mm; margin: 0; \}/);
+  assert.match(html, /<img alt="" src="data:image\/png;base64,AAAA">/);
+  assert.match(html, /width: 48mm; height: 40mm; margin: 3mm 5mm 20mm/);
+  assert.doesNotMatch(html, /size:[^;]*auto/);
+  assert.match(htmlTicketImagen("x", 40, 80, "driver"), /@page \{ margin: 0; \}/);
+});
+
+test("renderizarTicket sin canvas (Node) devuelve null y se imprime como texto", () => {
+  assert.equal(renderizarTicket("hola", 80), null);
 });
