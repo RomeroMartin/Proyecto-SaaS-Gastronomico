@@ -8,6 +8,10 @@
 // exacto: sin margen blanco, sin tira larga y sin A4.
 // La letra se calcula para que entren exactamente `columnas` caracteres en el
 // ancho imprimible del papel (monoespaciada, 0,6 em por carácter).
+// El ticket se IMPRIME COMO IMAGEN (se dibuja en un canvas a la resolución de la térmica, ~203 dpi):
+// si se manda como texto, el driver lo reemplaza por la letra interna de la impresora (otra tipografía,
+// otro tamaño, "×" y "·" salen como "#" y "π", se pierden las líneas en blanco y se corta el final).
+// Como imagen, sale EXACTAMENTE como se ve en la vista previa. Si el canvas no está disponible, se usa el texto.
 // ============================================================
 
 const MM_A_PX = 96 / 25.4;
@@ -84,6 +88,56 @@ pre { margin: 0; box-sizing: border-box; width: ${m.anchoMm}mm; padding: ${MARGE
 </style></head><body><pre>${esc}</pre></body></html>`;
 }
 
+const PUNTOS_POR_MM = 8; // 203 dpi ≈ 8 puntos por mm (térmicas estándar)
+
+/**
+ * Dibuja el ticket en un canvas a la resolución de la térmica (blanco y negro puro, letra en negrita).
+ * @returns {{src:string, altoMm:number}|null}  null si el navegador no puede dibujar (se imprime como texto)
+ */
+export function renderizarTicket(texto, anchoMm = 80) {
+  try {
+    const p = PERFIL_PAPEL[Number(anchoMm)] || PERFIL_PAPEL[80];
+    const ancho = Math.round(p.imprimibleMm * PUNTOS_POR_MM);
+    const celda = ancho / p.columnas;                 // ancho de cada carácter, en puntos
+    const fuente = celda / 0.6;
+    const alto1 = Math.round(fuente * INTERLINEADO);
+    const lineas = String(texto).split("\n");
+    const canvas = document.createElement("canvas");
+    canvas.width = ancho; canvas.height = Math.max(1, lineas.length) * alto1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000"; ctx.textBaseline = "alphabetic";
+    ctx.font = `bold ${fuente}px "Courier New", Courier, "Liberation Mono", "DejaVu Sans Mono", monospace`;
+    lineas.forEach((ln, i) => {
+      const y = i * alto1 + fuente * 0.82 + (alto1 - fuente) / 2;
+      Array.from(ln).forEach((ch, c) => {             // carácter por carácter: la grilla queda exacta
+        if (ch === " ") return;
+        const w = ctx.measureText(ch).width;
+        ctx.fillText(ch, c * celda + Math.max(0, (celda - w) / 2), y);
+      });
+    });
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height), d = img.data;
+    for (let k = 0; k < d.length; k += 4) { const v = d[k] < 150 ? 0 : 255; d[k] = d[k + 1] = d[k + 2] = v; d[k + 3] = 255; }
+    ctx.putImageData(img, 0, 0);
+    return { src: canvas.toDataURL("image/png"), altoMm: canvas.height / PUNTOS_POR_MM };
+  } catch (_e) { return null; }
+}
+
+/** HTML de la página con el ticket ya dibujado como imagen (src = data URL). */
+export function htmlTicketImagen(src, altoImagenMm, anchoMm = 80, modo = "ajustado", colaMm = COLA_POR_DEFECTO_MM) {
+  const p = PERFIL_PAPEL[Number(anchoMm)] || PERFIL_PAPEL[80];
+  const cola = limitarCola(colaMm);
+  const altoPagina = Math.max(Math.ceil(altoImagenMm + 2 * MARGEN_VERTICAL_MM + cola), p.anchoMm + ALTO_MIN_SOBRE_ANCHO_MM);
+  const pagina = modo === "driver" ? "@page { margin: 0; }" : `@page { size: ${p.anchoMm}mm ${altoPagina}mm; margin: 0; }`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Comanda</title>
+<style>
+${pagina}
+html, body { margin: 0; padding: 0; background: #fff; width: ${p.anchoMm}mm; }
+img { display: block; width: ${p.imprimibleMm}mm; height: ${altoImagenMm}mm; margin: ${MARGEN_VERTICAL_MM}mm ${(p.anchoMm - p.imprimibleMm) / 2}mm ${cola}mm; image-rendering: pixelated; }
+</style></head><body><img alt="" src="${src}"></body></html>`;
+}
+
 /**
  * @param {string} texto   ticket en texto plano (monoespaciado)
  * @param {number} anchoMm 58 u 80
@@ -100,10 +154,13 @@ export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel(), colaM
       document.body.appendChild(marco);
       const doc = marco.contentWindow.document;
       doc.open();
-      doc.write(htmlTicket(texto, anchoMm, modo, colaMm));
+      const dib = renderizarTicket(texto, anchoMm);
+      doc.write(dib ? htmlTicketImagen(dib.src, dib.altoMm, anchoMm, modo, colaMm) : htmlTicket(texto, anchoMm, modo, colaMm));
       doc.close();
       const limpiar = () => setTimeout(() => { try { marco.remove(); } catch (_e) { /* ya no está */ } }, 1500);
-      setTimeout(() => {
+      const imagen = marco.contentWindow.document.querySelector("img");
+      const listo = imagen && !imagen.complete ? new Promise((ok) => { imagen.onload = imagen.onerror = ok; }) : Promise.resolve();
+      Promise.race([listo, new Promise((ok) => setTimeout(ok, 1500))]).then(() => setTimeout(() => {
         try {
           marco.contentWindow.focus();
           marco.contentWindow.print();   // bloquea hasta que se cierra el diálogo (o sale directo con --kiosk-printing)
@@ -113,7 +170,7 @@ export function imprimirTicket(texto, anchoMm = 80, modo = getModoPapel(), colaM
           limpiar();
           resolve({ ok: false, error: (err && err.message) || String(err) });
         }
-      }, 150);
+      }, 150));
     } catch (err) {
       try { if (marco) marco.remove(); } catch (_e) { /* nada */ }
       resolve({ ok: false, error: (err && err.message) || String(err) });
