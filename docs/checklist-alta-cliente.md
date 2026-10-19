@@ -75,19 +75,20 @@ Dependencias (la base las valida): `ventas` requiere `carta` y `admin`; `reparto
 
 Orden recomendado (cada paso usa el anterior):
 
-1. **Proveedores** (nombre, CUIT, condición fiscal, rubros, contacto).
+1. **Proveedores** (nombre, CUIT, condición fiscal, rubros, contacto). *(Importable desde Excel.)*
 2. **Insumos**: rubro, unidad de uso (g / ml / un), presentación y precio de compra, IVA.
-   Usar nombres con la presentación ("Aperol 750cc", "Harina 0000 x 25kg").
+   Usar nombres con la presentación ("Aperol 750cc", "Harina 0000 x 25kg"). *(Importable desde Excel, después de los proveedores.)*
 3. **Recetas**: primero las **preparaciones** (almíbares, salsas, masas…), después los **platos**.
    Los platos llevan precio de carta, sector y categoría de venta.
 4. **Carta de venta**: marcar `vende_en_mostrador` en los platos que se venden por caja;
    cargar los **adicionales** si hay.
-5. **Gastos fijos** (alquiler, servicios, etc.). **Sin sueldos** si usa RRHH.
+5. **Gastos fijos** (alquiler, servicios, etc.). **Sin sueldos** si usa RRHH. *(Importable desde Excel.)*
 
 Cómo cargar:
 - Pocos datos: desde la app, pantalla por pantalla.
-- Muchos datos: con el **importador de Excel** (cuando esté disponible) o con un script SQL de
-  carga inicial (como el de Green Garden), siempre idempotente y probado antes en una base local.
+- Muchos datos: con **Importar desde Excel** (botón en Proveedores, Insumos y Gastos fijos; descarga la
+  plantilla, valida fila por fila y guarda todo o nada; ver el manual). Las **recetas se cargan en la app**.
+  Alternativa: un script SQL de carga inicial (como el de Green Garden), idempotente y probado antes en una base local.
 
 - [ ] Proveedores
 - [ ] Insumos (con costos revisados: ningún costo en cero ni 10 veces más caro)

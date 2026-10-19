@@ -13,6 +13,7 @@ import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
 import { exportarExcel } from "../../export/excel.js";
 import { hoyISO, diasEntre } from "../../core/utilsFecha.js";
 import { escapar, setMsg, labelInfo, datalist, kpiHTML, abrirModal, cerrarModal, toast, confirmar } from "./helpers.js";
+import { abrirImportador, puedeImportar } from "./importador.js";
 import { verFactura, validarFechas, FECHA_MIN, FECHA_MAX } from "./facturaModal.js";
 
 const LABEL_COND = { responsable_inscripto: "Resp. Inscripto", monotributo: "Monotributo", exento: "Exento" };
@@ -72,7 +73,10 @@ function render() {
   CONTENEDOR.innerHTML = `
     <div class="topbar" style="margin-bottom:14px;">
       <h2 style="margin:0;">Proveedores</h2>
-      <button id="prov-nuevo">+ Nuevo proveedor</button>
+      <div style="display:flex;gap:8px;">
+        ${puedeImportar("proveedores", PERFIL) ? '<button id="prov-importar" class="secundario">Importar desde Excel</button>' : ""}
+        <button id="prov-nuevo">+ Nuevo proveedor</button>
+      </div>
     </div>
 
     <div class="kpi-grid">
@@ -98,6 +102,8 @@ function render() {
     <div class="card"><div id="prov-tabla" class="tabla-scroll"></div></div>`;
 
   CONTENEDOR.querySelector("#prov-nuevo").addEventListener("click", () => abrirForm(null));
+  const impBtn = CONTENEDOR.querySelector("#prov-importar");
+  if (impBtn) impBtn.addEventListener("click", () => abrirImportador({ tipo: "proveedores", perfil: PERFIL, onTerminado: () => cargar() }));
   CONTENEDOR.querySelector("#prov-limpiar").addEventListener("click", () => {
     CONTENEDOR.querySelector("#prov-buscar").value = "";
     CONTENEDOR.querySelector("#prov-frubro").value = "";

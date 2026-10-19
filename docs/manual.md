@@ -164,6 +164,8 @@ aumentos** registrados.
     Si cambia el costo, queda en el **historial** y se **recalculan las
     recetas**.
   - **Baja.**
+- **Importar desde Excel:** carga muchos insumos de una vez (ver
+  [Importar desde Excel](#importar-desde-excel)).
 
 ### 4.3 Historial de precios
 Elegís un insumo y ves la **evolución de su costo**: un **mini-gráfico** y una
@@ -213,6 +215,45 @@ Muestra lo que **realmente se vendió** en un rango (7 / 30 días, este mes, mes
   ventas y comparación contra el food cost teórico de la carta de hoy.
 - **Por día de la semana** y **por franja horaria** (hora local).
 - **Exportar a Excel** baja la tabla por plato. Si hay insumos con precio sin actualizar hace más de 30 días, se avisa.
+
+### Importar desde Excel
+
+Hay un botón **Importar desde Excel** en **Proveedores**, **Insumos** y
+**Reparto → Gastos fijos** (cada uno lo ve quien puede cargar esos datos). Sirve
+para dar de alta un cliente nuevo sin cargar uno por uno. **Las recetas se
+cargan directamente en la app.**
+
+1. **Descargá la plantilla** (trae las hojas *Datos*, *Ejemplo* e *Instrucciones*)
+   y completá la hoja **Datos**. No cambies los títulos de las columnas; el orden
+   no importa. Las que tienen \* son obligatorias.
+2. **Subí el archivo** (.xlsx, .xls o .csv; hasta 2000 filas y 5 MB). La app lo
+   revisa y muestra una **vista previa**: filas *nuevas*, filas que *ya existen*
+   (mismo nombre, sin distinguir mayúsculas) y filas **con error**, con el motivo.
+3. Elegí qué hacer con las que ya existen: **saltearlas** (por defecto) o
+   **actualizarlas** con los datos del archivo.
+4. **Confirmá.** Se guarda **todo junto**: si algo falla, no se guarda nada. Si
+   hay filas con error, corregí el Excel y volvé a subirlo.
+
+Detalles por tipo:
+- **Proveedores:** nombre, razón social, CUIT, condición fiscal (si queda vacía,
+  Responsable inscripto), contacto, teléfono, email y rubros (separados por coma;
+  el primero es el principal).
+- **Insumos:** nombre, rubro, proveedor (tiene que estar cargado: importá primero los
+  proveedores), presentación, **cantidad que trae** y **unidad** (g, kg, mg, ml, l,
+  cc, oz, un), **precio de la presentación**, si el precio **incluye IVA** (Sí/No; si
+  queda vacío se toma como neto), IVA % (21 por defecto) y factor de corrección (1
+  por defecto). El costo por unidad se calcula igual que en el formulario de Insumos,
+  y la unidad que ponés es la **unidad de uso** de las recetas. Cada insumo nuevo
+  deja su primer punto en el historial de precios (*carga inicial*).
+- **Gastos fijos:** nombre, categoría, monto mensual, día de vencimiento y egresos de
+  caja que cuentan como pagado. Con RRHH activo no se importan sueldos ni cargas
+  sociales.
+- Al actualizar un insumo existente **no** se puede cambiar su magnitud de uso
+  (masa/volumen/unidad), porque altera sus recetas: editalo desde la pantalla.
+
+Orden recomendado: **proveedores → insumos → gastos fijos**.
+
+---
 
 ## 5b. Módulo Ventas (mostrador)
 
