@@ -1382,6 +1382,7 @@ Los existentes quedan como están.
 | 11b | `f2_ventas_rpc.sql` (RPC del mostrador) | 2.4 |
 | 12 | `f3_ventas_reportes.sql` (vistas `v_ventas_*`, `compras_periodo`, `set_config_reportes`) | 3 |
 | 13 | `f4_reparto.sql` | 4 |
+| 14 | `f5_importacion.sql` (RPC `importar_*`) | 5 |
 
 Cada fase entrega además su carpeta de tests en `supabase/tests/`.
 

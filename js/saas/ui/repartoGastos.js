@@ -12,6 +12,7 @@ import { moduloActivo } from "../../core/modulos.js";
 import { CATEGORIAS_RESERVADAS } from "../../core/reparto.js";
 import { pesosACentavos, formatearCentavos } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo, datalist, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
+import { abrirImportador } from "./importador.js";
 
 const $ = (c, s) => c.querySelector(s);
 let PERFIL = null;
@@ -28,7 +29,8 @@ export async function montar(container, perfil) {
 
   container.innerHTML = `
     <div class="topbar" style="margin-bottom:14px;"><h2 style="margin:0;">Reparto · Gastos fijos</h2>
-      <button id="rg-nuevo">+ Nuevo gasto fijo</button></div>
+      <div style="display:flex;gap:8px;"><button id="rg-importar" class="secundario">Importar desde Excel</button>
+        <button id="rg-nuevo">+ Nuevo gasto fijo</button></div></div>
     ${conRRHH ? `<p class="muted" style="margin:0 0 10px;font-size:12.5px;">Los <b>sueldos y cargas</b> salen de RRHH (por empleado): no los cargues acá, así no se cuentan dos veces.</p>` : ""}
     <div class="card" style="margin-top:0;">
       ${gastos.length ? `<div class="tabla-scroll"><table>
@@ -42,6 +44,7 @@ export async function montar(container, perfil) {
         : "<p class='muted' style='margin:0;'>Todavía no hay gastos fijos. Cargá el alquiler, los servicios, el retiro del dueño… cada uno es un sobre del tablero.</p>"}
     </div>`;
   $(container, "#rg-nuevo").addEventListener("click", () => editar(container, null, conRRHH));
+  $(container, "#rg-importar").addEventListener("click", () => abrirImportador({ tipo: "gastos", perfil, onTerminado: () => montar(container, perfil) }));
   container.querySelectorAll("[data-ed]").forEach((b) => b.addEventListener("click", () => editar(container, gastos.find((g) => g.id === b.dataset.ed), conRRHH)));
   container.querySelectorAll("[data-baja]").forEach((b) => b.addEventListener("click", async () => {
     if (!(await confirmar({ titulo: "Dar de baja", mensaje: "El gasto fijo deja de contarse en el tablero. ¿Seguro?", textoOk: "Dar de baja", peligro: true }))) return;

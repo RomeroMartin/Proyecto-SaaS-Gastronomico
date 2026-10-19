@@ -12,6 +12,7 @@ import { ALICUOTAS_IVA } from "../../core/fiscal.js";
 import { costoRealPorUnidadBase } from "../../core/costeo.js";
 import { pesosACentavos, formatearCentavos, formatearPorcentaje } from "../../core/dinero.js";
 import { escapar, setMsg, labelInfo, datalist, toast, confirmar, abrirModal, cerrarModal } from "./helpers.js";
+import { abrirImportador, puedeImportar } from "./importador.js";
 
 let PERFIL = null;
 let CONT = null;
@@ -36,6 +37,7 @@ export async function montar(container, perfil) {
       <div class="topbar"><h2 style="margin:0;">Insumos</h2>
         <div style="display:flex;gap:8px;">
           <button id="ins-refrescar" class="secundario">Refrescar</button>
+          ${puedeImportar("insumos", perfil) ? '<button id="ins-importar" class="secundario">Importar desde Excel</button>' : ""}
           <button id="ins-nuevo">+ Nuevo insumo</button>
         </div></div>
       <div class="toolbar" style="margin-top:12px;">
@@ -57,6 +59,8 @@ export async function montar(container, perfil) {
 
   container.querySelector("#ins-refrescar").addEventListener("click", () => refrescar(container));
   container.querySelector("#ins-nuevo").addEventListener("click", abrirNuevo);
+  const impBtn = container.querySelector("#ins-importar");
+  if (impBtn) impBtn.addEventListener("click", () => abrirImportador({ tipo: "insumos", perfil, onTerminado: () => refrescar(container) }));
   ["#ins-buscar", "#ins-frubro", "#ins-fprov", "#ins-orden"].forEach((sel) =>
     container.querySelector(sel).addEventListener("input", () => dibujarLista(container)));
 
