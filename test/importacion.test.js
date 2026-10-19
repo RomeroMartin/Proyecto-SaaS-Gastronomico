@@ -175,3 +175,33 @@ test("IVA en celda con formato porcentaje (0,21 / 0,105) se entiende como 21 / 1
   assert.equal(d("21%").datos.alicuota_iva, 21);
   assert.equal(d(0).datos.alicuota_iva, 0);
 });
+
+test("insumo: unidad de uso distinta de la de compra (misma magnitud): se calcula la cantidad de uso", () => {
+  // botella de 750 ml a $8.253,41 neto, usada en oz → igual que el formulario (cantidad de uso = 750 ml en oz)
+  const d = validarFilas("insumos", [fila({ nombre: "Aperol", cantidad: 750, unidad: "ml", precio: 8253.41, unidad_uso: "oz" })]).filas[0];
+  assert.equal(d.estado, "nueva");
+  const x = d.datos;
+  assert.equal(x.unidad_uso, "oz"); assert.equal(x.presentacion_unidad, "ml"); assert.equal(x.presentacion_cantidad, 750);
+  assert.equal(x.magnitud, "volumen"); assert.equal(x.unidad_base, "ml"); assert.equal(x.presentacion_cantidad_base, 750);
+  assert.equal(x.costo_neto_por_unidad_base_centavos, costoNetoPorUnidadBase(825341, 750));
+  // la misma botella cargando la cantidad de uso a mano: 25,36 oz
+  const y = validarFilas("insumos", [fila({ nombre: "Aperol 2", cantidad: 750, unidad: "ml", precio: 8253.41, unidad_uso: "oz", cantidad_uso: 25 })]).filas[0].datos;
+  assert.ok(Math.abs(y.presentacion_cantidad_base - 25 * 29.5735) < 1e-9);
+  assert.equal(y.unidad_uso, "oz");
+  // sin unidad de uso: es la de compra
+  assert.equal(validarFilas("insumos", [fila({ nombre: "B", cantidad: 5, unidad: "kg", precio: 100 })]).filas[0].datos.unidad_uso, "kg");
+  // kg de compra, g de uso
+  const k = validarFilas("insumos", [fila({ nombre: "C", cantidad: 5, unidad: "kg", precio: 34000, unidad_uso: "g" })]).filas[0].datos;
+  assert.equal(k.unidad_uso, "g"); assert.equal(k.presentacion_cantidad_base, 5000); assert.equal(k.costo_neto_por_unidad_base_centavos, 680);
+});
+
+test("insumo: unidad de uso de otra magnitud exige la cantidad de uso; errores de unidad de uso", () => {
+  const sin = validarFilas("insumos", [fila({ nombre: "Frutilla", cantidad: 1, unidad: "kg", precio: 8500, unidad_uso: "porción" })]).filas[0];
+  assert.equal(sin.estado, "error"); assert.match(sin.errores[0], /Cantidad de uso que trae/);
+  const con = validarFilas("insumos", [fila({ nombre: "Frutilla", cantidad: 1, unidad: "kg", precio: 8500, unidad_uso: "porción", cantidad_uso: 6.67 })]).filas[0].datos;
+  assert.equal(con.magnitud, "unidad"); assert.equal(con.unidad_base, "un"); assert.equal(con.presentacion_magnitud, "masa");
+  assert.equal(con.presentacion_unidad, "kg"); assert.equal(con.unidad_uso, "un"); assert.equal(con.presentacion_cantidad_base, 6.67);
+  assert.equal(con.costo_neto_por_unidad_base_centavos, costoNetoPorUnidadBase(850000, 6.67));
+  assert.match(validarFilas("insumos", [fila({ nombre: "X", cantidad: 1, unidad: "kg", precio: 1, unidad_uso: "furlong" })]).filas[0].errores[0], /Unidad de uso no reconocida/);
+  assert.match(validarFilas("insumos", [fila({ nombre: "X", cantidad: 1, unidad: "kg", precio: 1, unidad_uso: "g", cantidad_uso: -3 })]).filas[0].errores[0], /cantidad de uso/);
+});

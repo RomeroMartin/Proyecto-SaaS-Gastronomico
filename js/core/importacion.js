@@ -122,7 +122,9 @@ export const TIPOS = {
       { clave: "proveedor", titulo: "Proveedor", ejemplo: ["", "Molinos del Sur"], ayuda: "Nombre de un proveedor YA cargado (importá primero los proveedores)." },
       { clave: "presentacion", titulo: "Presentación", ejemplo: ["Botella 750 cc", "Bolsa 25 kg"], ayuda: "Cómo lo comprás (texto libre).", aliases: ["descripcion", "presentaciondecompra"] },
       { clave: "cantidad", titulo: "Cantidad", requerida: true, ejemplo: [750, 25], ayuda: "Cuánto trae la presentación, en la unidad de la columna siguiente.", aliases: ["cantidadquetrae", "contenido"] },
-      { clave: "unidad", titulo: "Unidad", requerida: true, ejemplo: ["ml", "kg"], ayuda: "g, kg, mg, ml, l, cc, oz, un (docena, ciento). En esa unidad se cargan luego las recetas." },
+      { clave: "unidad", titulo: "Unidad", requerida: true, ejemplo: ["ml", "kg"], ayuda: "Unidad en la que viene la presentación: g, kg, mg, ml, l, cc, oz, un (docena, ciento).", aliases: ["unidaddecompra"] },
+      { clave: "unidad_uso", titulo: "Unidad de uso", ejemplo: ["oz", "g"], ayuda: "La unidad con la que se cargan las recetas y se muestra el costo (ej: oz, cc, g). Si queda vacía, es la misma que «Unidad».", aliases: ["unidaduso", "usoen"] },
+      { clave: "cantidad_uso", titulo: "Cantidad de uso que trae", ejemplo: ["", ""], ayuda: "Cuántas unidades de uso trae la presentación. Solo hace falta si la unidad de uso es de OTRA magnitud que la de compra (ej: compro 1 kg y lo uso en porciones). Si no, se calcula sola.", aliases: ["cantidadduso", "cantidaduso", "cantidaddeusoquetrae"] },
       { clave: "precio", titulo: "Precio", requerida: true, ejemplo: [8253.41, 24000], ayuda: "Lo que cuesta TODA la presentación (no por unidad).", aliases: ["preciodelapresentacion", "costo"] },
       { clave: "precio_con_iva", titulo: "Precio incluye IVA", ejemplo: ["No", "Sí"], ayuda: "Sí o No. Si queda vacío se toma como No (precio neto, sin IVA).", aliases: ["incluyeiva", "coniva", "preciocoiniva"] },
       { clave: "iva", titulo: "IVA %", ejemplo: [21, 21], ayuda: "0, 10,5, 21 o 27. Si queda vacío: 21.", aliases: ["alicuota", "alicuotaiva"] },
@@ -255,22 +257,37 @@ function validarInsumo(f, ctx) {
     if (!provId) errores.push(`El proveedor «${prov}» no existe: importalo o cargalo antes.`);
   }
 
+  // Unidad de uso (la que leen las recetas): por defecto, la misma de compra.
+  let uso = unidad, cantidadUso = null;
+  if (unidad && !vacio(f.unidad_uso)) {
+    uso = unidadCanonica(f.unidad_uso);
+    if (!uso) { errores.push(`Unidad de uso no reconocida: «${texto(f.unidad_uso)}» (g, kg, mg, ml, l, cc, oz, un).`); uso = unidad; }
+  }
+  if (!vacio(f.cantidad_uso)) {
+    cantidadUso = numero(f.cantidad_uso);
+    if (cantidadUso === null || cantidadUso <= 0) { errores.push(`La cantidad de uso «${texto(f.cantidad_uso)}» tiene que ser un número mayor a cero.`); cantidadUso = null; }
+  }
+  if (unidad && uso && magnitudDe(uso) !== magnitudDe(unidad) && cantidadUso === null && !errores.length) {
+    errores.push(`La unidad de uso (${uso}) es de otra magnitud que la de compra (${unidad}): indicá en «Cantidad de uso que trae» cuántas ${uso} trae la presentación.`);
+  }
+
   let datos = null, resumen = "";
   if (!errores.length) {
-    const magnitud = magnitudDe(unidad);
+    const magCompra = magnitudDe(unidad), magnitud = magnitudDe(uso);
     const netoPesos = conIva ? precioNum / (1 + iva / 100) : precioNum;
     const precioCentavos = Math.round(netoPesos * 100);
-    const cantidadBase = cantidad * FACTORES_A_BASE[unidad];
+    // unidades base de USO que trae la presentación (igual que el formulario de Insumos)
+    const cantidadBase = cantidadUso !== null ? cantidadUso * FACTORES_A_BASE[uso] : cantidad * FACTORES_A_BASE[unidad];
     const costo = costoNetoPorUnidadBase(precioCentavos, cantidadBase);
     datos = {
       nombre, rubro: texto(f.rubro), magnitud, unidad_base: MAGNITUDES[magnitud].base, costo_neto_por_unidad_base_centavos: costo,
       alicuota_iva: iva, factor_correccion: factor, presentacion_desc: texto(f.presentacion),
       presentacion_cantidad_base: cantidadBase, presentacion_precio_neto_centavos: precioCentavos,
-      presentacion_magnitud: magnitud, presentacion_cantidad: cantidad, presentacion_unidad: unidad, unidad_uso: unidad,
+      presentacion_magnitud: magCompra, presentacion_cantidad: cantidad, presentacion_unidad: unidad, unidad_uso: uso,
       proveedor_habitual_id: provId,
     };
-    const porUso = (costo * FACTORES_A_BASE[unidad]) / 100;
-    resumen = `${cantidad} ${unidad} · neto $${(precioCentavos / 100).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · $${porUso.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} por ${unidad}`;
+    const porUso = (costo * FACTORES_A_BASE[uso]) / 100;
+    resumen = `${cantidad} ${unidad} · neto $${(precioCentavos / 100).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · $${porUso.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} por ${uso}`;
     if (costo === 0) avisos.push("El costo por unidad da 0: revisá cantidad y precio.");
   }
   return { nombre, errores, avisos, datos, resumen };
