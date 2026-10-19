@@ -242,9 +242,14 @@ Detalles por tipo:
   proveedores), presentación, **cantidad que trae** y **unidad** (g, kg, mg, ml, l,
   cc, oz, un), **precio de la presentación**, si el precio **incluye IVA** (Sí/No; si
   queda vacío se toma como neto), IVA % (21 por defecto) y factor de corrección (1
-  por defecto). El costo por unidad se calcula igual que en el formulario de Insumos,
-  y la unidad que ponés es la **unidad de uso** de las recetas. Cada insumo nuevo
-  deja su primer punto en el historial de precios (*carga inicial*).
+  por defecto). La **unidad de uso** es la que leen las recetas y en la que se
+  muestra el costo (ej: comprás una botella de 750 ml y la usás en **oz**): va en la
+  columna *Unidad de uso*; si queda vacía, es la misma que *Unidad*. Si la unidad de
+  uso es de **otra magnitud** que la de compra (comprás 1 kg y lo usás en porciones),
+  completá también *Cantidad de uso que trae* (cuántas porciones trae el kilo); si es
+  de la misma magnitud, se calcula sola. El costo por unidad se calcula igual que en
+  el formulario de Insumos. Cada insumo nuevo deja su primer punto en el historial de
+  precios (*carga inicial*).
 - **Gastos fijos:** nombre, categoría, monto mensual, día de vencimiento y egresos de
   caja que cuentan como pagado. Con RRHH activo no se importan sueldos ni cargas
   sociales.
