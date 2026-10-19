@@ -16,7 +16,9 @@ lleva por estados hasta que se entrega o se retira. El primer cliente es **Mante
 2. **Con caja abierta**, la cajera puede **pausar** los pedidos y **activar o desactivar por separado el
    retiro (take away) y el delivery** (puede trabajar solo con uno de los dos).
 3. **No hay pasarela de pago.** El cliente elige *efectivo* (al retirar o al recibir) o *transferencia* (la
-   página le muestra el alias y el monto). La cajera resuelve el cobro.
+   página le muestra el alias y el monto). La cajera resuelve el cobro, y **el pago es independiente del
+   estado del pedido**: todo pedido empieza **sin abonar** y la cajera lo marca **abonado** cuando la plata
+   realmente entró (ver sección 2b). Un pedido puede estar confirmado y en viaje y seguir sin abonar.
 4. **No se imprime nada hasta que la cajera confirma.** Un pedido recién llegado está "entrado" y solo suena
    y aparece en la bandeja.
 5. **Carta online = la carta de venta** (todo lo que tiene `vende_en_mostrador`), con la posibilidad de
@@ -35,7 +37,7 @@ lleva por estados hasta que se entrega o se retira. El primer cliente es **Mante
 | `en_preparacion` | cajera | — |
 | `listo_retiro` | cajera (solo retiro) | Aviso al cliente de que ya puede pasar. |
 | `en_viaje` | cajera (solo delivery) | — |
-| `finalizado` | cajera | Retirado / entregado. Marca el pedido del mostrador como entregado. |
+| `finalizado` | cajera | Retirado / entregado. **Exige que esté abonado** (si no, se cobra en el mismo paso). Marca el pedido del mostrador como entregado. |
 | `rechazado` | cajera (desde `entrado`) | Con motivo. No genera pedido ni impresión. |
 | `cancelado` | cajera (desde `confirmado` en adelante) | Con motivo. Anula el pedido del mostrador. |
 
@@ -45,6 +47,32 @@ Transiciones válidas: `entrado → confirmado | rechazado` · `confirmado → e
 
 **Al cerrar la caja:** los pedidos `entrado` se rechazan solos ("el local cerró") y, si quedan pedidos
 `confirmado/en_preparacion/en_viaje/listo_retiro`, el cierre avisa y pide finalizarlos o cancelarlos.
+**Tampoco se puede cerrar la caja con pedidos sin abonar** (ver 2b).
+
+### 2b. Pago: abonado / sin abonar
+
+El pago es un dato aparte del estado, con dos valores: **`sin_abonar`** y **`abonado`**.
+
+| Caso | Cuándo se marca *abonado* |
+|---|---|
+| **Transferencia** | Cuando la cajera ve la plata en su banco. Puede ser **antes o después de confirmar**. |
+| **Efectivo con retiro** | Cuando el cliente paga al retirar. |
+| **Efectivo con delivery** | Cuando vuelve el repartidor con la plata, es decir, al **finalizar** el pedido. Mientras está **en viaje**, sigue sin abonar. |
+
+Reglas:
+- Se puede **confirmar y mover un pedido sin abonar**: lo que exige confirmación es el reparto, no el pago.
+- La cajera elige **con qué medio se cobró realmente** al marcarlo abonado (el cliente pudo decir "efectivo" y
+  pagar por transferencia). Por defecto se propone el que eligió el cliente.
+- **No se puede finalizar un pedido sin abonar**: al finalizar, la pantalla pide cobrarlo en el mismo paso
+  ("¿Cuánto y cómo se cobró?").
+- **La plata entra a la caja recién al marcar abonado.** Un pedido sin abonar no suma efectivo esperado ni ingresos
+  del Flujo de caja; al cobrarlo, sí, en el turno abierto.
+- **No se puede cerrar la caja** mientras haya pedidos confirmados sin abonar: el cierre lista cuáles son para
+  cobrarlos o cancelarlos (así el efectivo esperado y el cierre nunca quedan inflados).
+- Si un pedido sin abonar se **cancela**, no hay nada que devolver ni anular en la caja. Si ya estaba abonado, se
+  anula como cualquier pedido del mostrador.
+- La **comanda** impresa lo deja a la vista: **"A COBRAR $X EN EFECTIVO"** (para que el repartidor sepa que tiene que
+  cobrar), **"TRANSFERENCIA: VERIFICAR"** o **"ABONADO"**.
 
 ## 3. Modelo de datos (`supabase/f6_pedidos_web.sql`)
 
@@ -53,11 +81,15 @@ Transiciones válidas: `entrado → confirmado | rechazado` · `confirmado → e
 `web_demora_retiro_min`, `web_demora_delivery_min`, `web_pedido_minimo_centavos`, `web_pedido_maximo_centavos`.
 El costo de envío único usa el `costo_envio_default_centavos` que ya existe (Etapa 1A); en 1B lo reemplazan las zonas.
 
+**`pedidos`** (mostrador): columna nueva **`pago_estado`** (`abonado` por defecto, así el mostrador sigue igual) que
+toma `sin_abonar` para los pedidos web hasta que se cobran.
+
 **`recetas`**: `oculto_online` (bool, por defecto false) y `agotado_online` (bool).
 
 **`pedidos_web`**: empresa, `numero_web`, `token_seguimiento` (aleatorio de 128 bits), estado, modalidad
 (`retiro|delivery`), datos del cliente (nombre, teléfono, email opcional), dirección (texto, `lat`, `lng`, `zona_id`),
-nota, `medio_pago` (`efectivo|transferencia`), `subtotal`, `envio`, `total` (centavos, calculados por el servidor),
+nota, `medio_pago` (el que **eligió** el cliente: `efectivo|transferencia`), **`pago_estado`** (`sin_abonar|abonado`),
+`medio_cobro` y `abonado_en` (cómo y cuándo se cobró de verdad), `subtotal`, `envio`, `total` (centavos, calculados por el servidor),
 `pedido_id` (el pedido del mostrador una vez confirmado), `motivo`, marcas de tiempo.
 **`pedidos_web_items`**: producto, nombre y precio congelados, cantidad, nota, adicionales (mismo modelo del mostrador).
 **`pedidos_web_eventos`**: historial de estados (estado, usuario, hora).
@@ -87,7 +119,15 @@ y **escribe solo por RPC**.
 mismos totales). Si los precios de la carta cambiaron mientras el pedido esperaba, **no confirma** y avisa a la
 cajera para que lo revise o lo rechace.
 
-Cobro: al confirmar se registra el medio elegido por el total. Si después el cliente no paga, se cancela y se anula.
+**Cobro (cambios en el módulo de ventas):**
+- `crear_pedido` acepta crear un pedido **sin pagos** cuando viene marcado `pago_pendiente` (solo lo usa la confirmación
+  web); el del mostrador sigue exigiendo que los pagos sumen el total.
+- Nueva **`registrar_cobro_pedido(pedido, medio)`**: inserta el pago por el total, pone `pago_estado = abonado` (en el
+  pedido y en `pedidos_web`) y deja auditoría. Solo con el turno abierto. También la usa "finalizar" cuando el pedido
+  está sin abonar.
+- **`cerrar_turno`** se rechaza si hay pedidos no anulados con `pago_estado = sin_abonar` (y dice cuáles).
+- `resumen_turno` y el cierre **no cambian de criterio**: siguen sumando `pedido_pagos`, que solo existen cuando se
+  cobró. Por eso el efectivo esperado y el Flujo de caja salen bien sin tocar nada más.
 
 ## 5. Seguridad y anti-abuso
 
@@ -108,13 +148,14 @@ checkout (retiro/delivery, datos, dirección con sugerencias, medio de pago, not
 link** que se actualiza solo. Cartel "Estamos cerrados / pausado" cuando corresponde.
 
 **En la app (solo con el módulo activo):**
-- **Pedidos web → Bandeja:** tablero por estado, **sonido** y contador al llegar un pedido, botones de avance, indicador
+- **Pedidos web → Bandeja:** tablero por estado, con una etiqueta **"Sin abonar" / "Abonado"** en cada pedido y el botón
+  **"Marcar abonado"** (elige el medio), **sonido** y contador al llegar un pedido, botones de avance, indicador
   **"Recibiendo pedidos / Desconectado"**, atajos para **pausar** y para activar/desactivar **retiro y delivery**,
   mensaje de WhatsApp prearmado para avisar al cliente.
 - **Pedidos web → Configuración:** link del negocio y QR, nombre público, mensaje, demoras, pedido mínimo, modalidades.
 - **Carta:** columna "Visible online" y "Agotado" por producto.
 - **Impresión:** al **confirmar** se imprime con el mismo motor del mostrador (formato Texto/Imagen, relleno, ancho).
-  Se agrega "WEB", modalidad, dirección, teléfono y cómo paga.
+  Se agrega "WEB", modalidad, dirección, teléfono y el estado del pago (**A COBRAR / ABONADO**).
 
 Tiempo real: **Supabase Realtime** sobre `pedidos_web` y, si se corta, reintento automático cada 8 segundos.
 Requisito operativo: la app abierta en la PC de caja durante el turno, con el Chrome ya configurado para imprimir
@@ -136,7 +177,7 @@ sin diálogo.
 
 | Etapa | Entrega | Pruebas |
 |---|---|---|
-| **1A.1** Base | Tablas, RLS, RPC públicas e internas, estados, anti-abuso | Tests SQL: permisos por rol, `anon` solo ve lo público, precios recalculados, transiciones válidas, límites, confirmar crea el pedido del mostrador, cambio de precios, cierre de caja |
+| **1A.1** Base | Tablas, RLS, RPC públicas e internas, estados, anti-abuso | Tests SQL: permisos por rol, `anon` solo ve lo público, precios recalculados, transiciones válidas, límites, confirmar crea el pedido del mostrador, cambio de precios, cierre de caja, **pago: sin abonar no suma a la caja, abonar al final, finalizar exige cobro, cierre bloqueado con pedidos sin abonar, cancelar sin abonar** |
 | **1A.2** App | Bandeja con sonido, configuración, disponibilidad online, impresión al confirmar | Pruebas en navegador con Supabase simulado; tests Node de la lógica |
 | **1A.3** Página pública | `pedir.html`: carta, carrito, checkout, seguimiento | Navegador móvil (viewport chico), casos cerrado/pausado/sin delivery |
 | **1B** Zonas | Editor de mapa, autocompletado, cotización de envío en el servidor | Tests SQL del punto-en-polígono (bordes, superpuestas, fuera de zona) y pruebas de pantalla |
