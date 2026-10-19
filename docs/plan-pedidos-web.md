@@ -5,7 +5,41 @@ del local, arma su pedido y le llega a la caja, que lo confirma (recién ahí se
 lleva por estados hasta que se entrega o se retira. El primer cliente es **Mantecados**, que hoy usa
 "Resto Simple" solo para esto.
 
-> Estado: **plan para aprobar**. No hay código todavía. Las etapas se entregan y se prueban por separado.
+> Estado: **plan aprobado por el dueño del producto; todavía no hay código.** Las etapas se entregan y se prueban por
+> separado.
+
+## 0. Para retomar (punto de partida)
+
+**Siguiente paso:** arrancar la **Etapa 1A.1** (base de datos + RPC + tests SQL), en una rama nueva desde `main`. Es lo
+primero de la sección 8. No empezar por pantallas.
+
+**Decisiones ya tomadas** (no volver a preguntarlas):
+- Link abierto solo con caja abierta; retiro y delivery se activan/desactivan por separado con la caja abierta; se puede pausar.
+- Sin pasarela de pago: efectivo o transferencia; **pago abonado/sin abonar independiente del estado** (sección 2b).
+- Nada se imprime hasta que la cajera **confirma**.
+- Carta online = carta de venta, con opción de ocultar/agotar solo online.
+- Delivery por **zonas dibujadas en un mapa** con precio; **fuera de zona se bloquea**; el cliente elige entre sugerencias de
+  dirección. Se hace en la **Etapa 1B**; en 1A el envío es el costo fijo `costo_envio_default_centavos`.
+- Estados: `entrado → confirmado → en_preparacion → listo_retiro | en_viaje → finalizado` (+ `rechazado`, `cancelado`).
+- Pasarela de pago, captcha, cupones y dominio propio quedan **fuera** de la Etapa 1.
+
+**Decisiones que faltan** (sección 9): proveedor de direcciones para 1B (propuesta: Geoapify/LocationIQ gratis detrás de
+`geocoder.js`), link definitivo y límites anti-abuso iniciales. **No bloquean la 1A.**
+
+**Archivos del repo que hay que mirar antes de empezar:**
+- `supabase/f2_ventas_rpc.sql` — `crear_pedido`, `cerrar_turno`, `anular_pedido`, `marcar_entregado`, `_resumen_turno`
+  (el pedido web termina creando un pedido del mostrador y hay que tocar `crear_pedido` y `cerrar_turno`).
+- `supabase/f2_ventas.sql` — tablas `turnos_caja`, `pedidos`, `pedido_items`, `pedido_pagos` y `es_adicional`.
+- `supabase/f1_modulos_empresa.sql` — cómo se agrega un módulo nuevo (`pedidos_web`) y sus dependencias (requiere `ventas`).
+- `supabase/tests/run.sh`, `tests/01_helpers.sql`, `tests/18_ventas.sql` — infraestructura y estilo de los tests SQL
+  (hay que sumar `f6_pedidos_web` a la lista de `run.sh` y que los tests de ventas existentes sigan pasando).
+- `js/saas/ui/ventasMostrador.js`, `js/saas/ui/impresion.js`, `js/core/ventas.js` — armado de comanda e impresión.
+- `docs/plan-ventas-reparto.md` — convenciones de las fases anteriores. Última fase aplicada: **5** (`f5_importacion.sql`).
+
+**Convenciones del proyecto a respetar:** frontend vanilla JS (módulos ES) + Supabase; precios y costos siempre
+calculados en la base; RPC `SECURITY DEFINER` con validación de empresa y rol adentro; SQL idempotente; cada fase con su
+`.sql` que se corre **una vez** en el SQL Editor antes de mergear; tests SQL en `supabase/tests/` y tests Node en `test/`;
+cada merge a `main` publica (GitHub Pages).
 
 ---
 
